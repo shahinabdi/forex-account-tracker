@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2 } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function ForexTracker() {
-  // Initial data from your Excel file
+  // Clean initial state - no pre-populated data
   const [summary, setSummary] = useState({
-    latestBalance: 134,
+    latestBalance: 0,
     targetStatus: 'Step1',
     currentTarget: 150,
     startForTarget: 15,
-    progressToTarget: 0.8814814815
+    progressToTarget: 0
   });
 
   const [settings, setSettings] = useState([
@@ -25,19 +25,16 @@ export default function ForexTracker() {
     { level: 'Step9', startBalance: 150000, targetBalance: 255000, status: 'Not Started', progress: '' }
   ]);
 
-  const [tradingData, setTradingData] = useState([
-    { id: 1, date: '', balance: 15.03, pnl: null, amountToTarget: 134.97, dailyGain: null, milestone: '', milestoneValue: null },
-    { id: 2, date: '2025-07-24', balance: 63.68, pnl: 48.65, amountToTarget: 86.32, dailyGain: 3.24, milestone: '', milestoneValue: null },
-    { id: 3, date: '2025-07-27', balance: 89.98, pnl: 26.3, amountToTarget: 60.02, dailyGain: 0.41, milestone: '', milestoneValue: null },
-    { id: 4, date: '2025-07-28', balance: 134, pnl: 44.02, amountToTarget: 16, dailyGain: 0.49, milestone: '', milestoneValue: null }
-  ]);
+  // Start with empty trading data
+  const [tradingData, setTradingData] = useState([]);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [newTrade, setNewTrade] = useState({
     date: new Date().toISOString().split('T')[0],
     balance: '',
     pnl: '',
-    milestone: ''
+    milestone: '',
+    type: 'trade' // 'trade', 'deposit', 'withdrawal', 'starting'
   });
 
   const [newGoal, setNewGoal] = useState({
@@ -76,41 +73,143 @@ export default function ForexTracker() {
     localStorage.setItem('forexTracker_summary', JSON.stringify(summary));
   }, [summary]);
 
-  // Calculate derived values
+  // Calculate derived values and auto-advance steps
   useEffect(() => {
     if (tradingData.length > 0) {
       const latest = tradingData[tradingData.length - 1];
-      const currentStep = settings.find(s => s.status === 'In Progress');
+      let currentStep = settings.find(s => s.status === 'In Progress');
+      
+      // Check if current target is reached and advance to next step
+      if (currentStep && latest.balance >= currentStep.targetBalance) {
+        const newSettings = settings.map(s => {
+          if (s.level === currentStep.level) {
+            return { ...s, status: 'Completed' };
+          }
+          return s;
+        });
+        
+        // Find next step to activate
+        const currentIndex = settings.findIndex(s => s.level === currentStep.level);
+        if (currentIndex < settings.length - 1) {
+          newSettings[currentIndex + 1].status = 'In Progress';
+          currentStep = newSettings[currentIndex + 1];
+        }
+        
+        setSettings(newSettings);
+      }
+      
       if (currentStep && latest.balance) {
-        const progress = (latest.balance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance);
+        const progress = Math.max(0, (latest.balance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance));
         setSummary(prev => ({
           ...prev,
           latestBalance: latest.balance,
           progressToTarget: Math.min(progress, 1),
           currentTarget: currentStep.targetBalance,
-          startForTarget: currentStep.startBalance
+          startForTarget: currentStep.startBalance,
+          targetStatus: currentStep.level
         }));
       }
+    } else {
+      // Reset to initial state when no data - including resetting all steps
+      const resetSettings = settings.map((setting, index) => ({
+        ...setting,
+        status: index === 0 ? 'In Progress' : 'Not Started'
+      }));
+      setSettings(resetSettings);
+      
+      setSummary({
+        latestBalance: 0,
+        targetStatus: 'Step1',
+        currentTarget: 150,
+        startForTarget: 15,
+        progressToTarget: 0
+      });
     }
-  }, [tradingData, settings]);
+  }, [tradingData]);
+
+  // Recalculate amount to target for all entries whenever data or settings change
+  useEffect(() => {
+    if (tradingData.length > 0) {
+      const currentStep = settings.find(s => s.status === 'In Progress');
+      if (currentStep) {
+        const updatedTradingData = tradingData.map(trade => ({
+          ...trade,
+          amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
+        }));
+        
+        // Only update if there's actually a change to avoid infinite loops
+        const hasChanges = updatedTradingData.some((trade, index) => 
+          trade.amountToTarget !== tradingData[index].amountToTarget
+        );
+        
+        if (hasChanges) {
+          setTradingData(updatedTradingData);
+        }
+      }
+    }
+  }, [settings]);
+
+  const calculateCorrectDailyGain = (currentBalance, previousBalance, type) => {
+    if (type === 'deposit' || type === 'withdrawal' || type === 'starting') {
+      return 0; // No gain calculation for non-trading activities
+    }
+    
+    if (previousBalance <= 0) return 0;
+    return ((currentBalance - previousBalance) / previousBalance) * 100;
+  };
 
   const addNewTrade = () => {
     if (newTrade.balance) {
-      const prevBalance = tradingData.length > 0 ? tradingData[tradingData.length - 1].balance : summary.startForTarget;
-      const pnl = parseFloat(newTrade.pnl) || (parseFloat(newTrade.balance) - prevBalance);
-      const dailyGain = prevBalance > 0 ? ((parseFloat(newTrade.balance) - prevBalance) / prevBalance) * 100 : 0;
+      let prevBalance = 0;
+      let pnl = 0;
+      let dailyGain = 0;
+
+      if (tradingData.length > 0) {
+        prevBalance = tradingData[tradingData.length - 1].balance;
+      } else if (newTrade.type === 'starting') {
+        prevBalance = 0;
+      } else {
+        prevBalance = summary.startForTarget;
+      }
+
+      const currentBalance = parseFloat(newTrade.balance);
+
+      // Calculate P&L and daily gain based on type
+      switch (newTrade.type) {
+        case 'trade':
+          pnl = parseFloat(newTrade.pnl) || (currentBalance - prevBalance);
+          dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+          break;
+        case 'deposit':
+          pnl = 0; // Deposits don't count as profit
+          dailyGain = 0;
+          break;
+        case 'withdrawal':
+          pnl = 0; // Withdrawals don't count as loss
+          dailyGain = 0;
+          break;
+        case 'starting':
+          pnl = 0;
+          dailyGain = 0;
+          break;
+        default:
+          pnl = parseFloat(newTrade.pnl) || (currentBalance - prevBalance);
+          dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+      }
+
       const currentStep = settings.find(s => s.status === 'In Progress');
-      const amountToTarget = currentStep ? currentStep.targetBalance - parseFloat(newTrade.balance) : 0;
+      const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
 
       const trade = {
         id: Date.now(),
         date: newTrade.date,
-        balance: parseFloat(newTrade.balance),
+        balance: currentBalance,
         pnl: pnl,
-        amountToTarget: Math.max(amountToTarget, 0),
+        amountToTarget: amountToTarget,
         dailyGain: dailyGain,
         milestone: newTrade.milestone,
-        milestoneValue: null
+        milestoneValue: null,
+        type: newTrade.type
       };
 
       setTradingData([...tradingData, trade]);
@@ -118,7 +217,8 @@ export default function ForexTracker() {
         date: new Date().toISOString().split('T')[0],
         balance: '',
         pnl: '',
-        milestone: ''
+        milestone: '',
+        type: 'trade'
       });
     }
   };
@@ -164,10 +264,10 @@ export default function ForexTracker() {
       ['', 'Progress to Target', summary.progressToTarget],
       ['', 'Progress Bar', ''],
       [''],
-      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Milestone', 'Milestone Value'],
+      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value'],
       ...tradingData.map(trade => [
         trade.date, trade.balance, trade.pnl, trade.amountToTarget, 
-        trade.dailyGain, trade.milestone, trade.milestoneValue
+        trade.dailyGain, trade.type, trade.milestone, trade.milestoneValue
       ])
     ]);
 
@@ -208,7 +308,8 @@ export default function ForexTracker() {
             amountToTarget: row['Amount to Target'] || 0,
             dailyGain: row['Daily Gain %'] || 0,
             milestone: row.Milestone || '',
-            milestoneValue: row['Milestone Value'] || null
+            milestoneValue: row['Milestone Value'] || null,
+            type: row.Type || 'trade'
           }));
         setTradingData(processedData);
       }
@@ -242,6 +343,32 @@ export default function ForexTracker() {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'deposit':
+        return <PlusCircle size={16} className="text-green-600" />;
+      case 'withdrawal':
+        return <MinusCircle size={16} className="text-red-600" />;
+      case 'starting':
+        return <Target size={16} className="text-blue-600" />;
+      default:
+        return <TrendingUp size={16} className="text-purple-600" />;
+    }
+  };
+
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case 'deposit':
+        return 'Deposit';
+      case 'withdrawal':
+        return 'Withdrawal';
+      case 'starting':
+        return 'Starting Balance';
+      default:
+        return 'Trade';
+    }
+  };
+
   // Chart data preparation
   const balanceChartData = tradingData.map(trade => ({
     date: formatDate(trade.date),
@@ -249,11 +376,13 @@ export default function ForexTracker() {
     target: summary.currentTarget
   }));
 
-  const pnlChartData = tradingData.filter(trade => trade.pnl !== null).map(trade => ({
-    date: formatDate(trade.date),
-    pnl: trade.pnl,
-    dailyGain: trade.dailyGain
-  }));
+  const pnlChartData = tradingData
+    .filter(trade => trade.pnl !== null && trade.type === 'trade')
+    .map(trade => ({
+      date: formatDate(trade.date),
+      pnl: trade.pnl,
+      dailyGain: trade.dailyGain
+    }));
 
   const progressData = [
     { name: 'Completed', value: summary.progressToTarget * 100, color: '#10b981' },
@@ -381,36 +510,55 @@ export default function ForexTracker() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Balance Chart */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Balance Over Time</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={balanceChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                    <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} />
-                    <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            {tradingData.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Balance Chart */}
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">Balance Over Time</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={balanceChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(value)} />
+                      <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} />
+                      <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
 
-              {/* P&L Chart */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Profit & Loss</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={pnlChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                    <Bar dataKey="pnl" fill="#10b981" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {/* P&L Chart */}
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">Trading Profit & Loss</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={pnlChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(value)} />
+                      <Bar dataKey="pnl" fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* No Data Message */}
+            {tradingData.length === 0 && (
+              <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+                <div className="text-gray-400 mb-4">
+                  <TrendingUp size={48} className="mx-auto" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">No Trading Data Yet</h3>
+                <p className="text-gray-500 mb-4">Start by adding your first trade or initial balance in the Trading tab.</p>
+                <button
+                  onClick={() => setActiveTab('trading')}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Go to Trading Tab
+                </button>
+              </div>
+            )}
 
             {/* Data Persistence Info */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
@@ -421,6 +569,7 @@ export default function ForexTracker() {
                 <p>• <strong>Export/Import:</strong> Use Excel files to backup or transfer your data</p>
                 <p>• <strong>Browser Storage:</strong> Data stays on your device - no cloud storage needed</p>
                 <p>• <strong>Privacy:</strong> Your trading data never leaves your computer</p>
+                <p>• <strong>Auto-Advancement:</strong> Steps automatically advance when targets are reached</p>
               </div>
             </div>
           </div>
@@ -429,10 +578,20 @@ export default function ForexTracker() {
         {/* Trading Tab */}
         {activeTab === 'trading' && (
           <div className="space-y-6">
-            {/* Add New Trade */}
+            {/* Add New Entry */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Add New Trade</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <h3 className="text-lg font-semibold mb-4">Add New Entry</h3>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <select
+                  value={newTrade.type}
+                  onChange={(e) => setNewTrade({...newTrade, type: e.target.value})}
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="trade">Trade</option>
+                  <option value="starting">Starting Balance</option>
+                  <option value="deposit">Deposit</option>
+                  <option value="withdrawal">Withdrawal</option>
+                </select>
                 <input
                   type="date"
                   value={newTrade.date}
@@ -446,11 +605,25 @@ export default function ForexTracker() {
                   onChange={(e) => setNewTrade({...newTrade, balance: e.target.value})}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                {newTrade.type === 'trade' && (
+                  <input
+                    type="number"
+                    placeholder="P&L (optional)"
+                    value={newTrade.pnl}
+                    onChange={(e) => setNewTrade({...newTrade, pnl: e.target.value})}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                )}
+                {newTrade.type !== 'trade' && (
+                  <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-500">
+                    N/A
+                  </div>
+                )}
                 <input
-                  type="number"
-                  placeholder="P&L (optional)"
-                  value={newTrade.pnl}
-                  onChange={(e) => setNewTrade({...newTrade, pnl: e.target.value})}
+                  type="text"
+                  placeholder="Milestone (optional)"
+                  value={newTrade.milestone}
+                  onChange={(e) => setNewTrade({...newTrade, milestone: e.target.value})}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button
@@ -458,7 +631,7 @@ export default function ForexTracker() {
                   className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Plus size={16} />
-                  Add Trade
+                  Add Entry
                 </button>
               </div>
             </div>
@@ -466,43 +639,66 @@ export default function ForexTracker() {
             {/* Trading History */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-lg font-semibold mb-4">Trading History</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">Date</th>
-                      <th className="text-left py-3 px-4">Balance</th>
-                      <th className="text-left py-3 px-4">P&L</th>
-                      <th className="text-left py-3 px-4">Amount to Target</th>
-                      <th className="text-left py-3 px-4">Daily Gain %</th>
-                      <th className="text-left py-3 px-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tradingData.map((trade) => (
-                      <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">{formatDate(trade.date)}</td>
-                        <td className="py-3 px-4 font-semibold">{formatCurrency(trade.balance)}</td>
-                        <td className={`py-3 px-4 font-semibold ${trade.pnl > 0 ? 'text-green-600' : trade.pnl < 0 ? 'text-red-600' : ''}`}>
-                          {trade.pnl ? formatCurrency(trade.pnl) : '-'}
-                        </td>
-                        <td className="py-3 px-4">{formatCurrency(trade.amountToTarget)}</td>
-                        <td className={`py-3 px-4 font-semibold ${trade.dailyGain > 0 ? 'text-green-600' : trade.dailyGain < 0 ? 'text-red-600' : ''}`}>
-                          {trade.dailyGain ? `${trade.dailyGain.toFixed(2)}%` : '-'}
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => deleteTrade(trade.id)}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+              {tradingData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No entries yet. Add your first entry above to get started.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4">Type</th>
+                        <th className="text-left py-3 px-4">Date</th>
+                        <th className="text-left py-3 px-4">Balance</th>
+                        <th className="text-left py-3 px-4">P&L</th>
+                        <th className="text-left py-3 px-4">Amount to Target</th>
+                        <th className="text-left py-3 px-4">Daily Gain %</th>
+                        <th className="text-left py-3 px-4">Milestone</th>
+                        <th className="text-left py-3 px-4">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {tradingData.map((trade) => (
+                        <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {getTypeIcon(trade.type)}
+                              <span className="text-sm">{getTypeLabel(trade.type)}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">{formatDate(trade.date)}</td>
+                          <td className="py-3 px-4 font-semibold">{formatCurrency(trade.balance)}</td>
+                          <td className={`py-3 px-4 font-semibold ${
+                            trade.type === 'trade' 
+                              ? trade.pnl > 0 ? 'text-green-600' : trade.pnl < 0 ? 'text-red-600' : ''
+                              : 'text-gray-400'
+                          }`}>
+                            {trade.type === 'trade' && trade.pnl !== null ? formatCurrency(trade.pnl) : '-'}
+                          </td>
+                          <td className="py-3 px-4">{formatCurrency(trade.amountToTarget)}</td>
+                          <td className={`py-3 px-4 font-semibold ${
+                            trade.type === 'trade' 
+                              ? trade.dailyGain > 0 ? 'text-green-600' : trade.dailyGain < 0 ? 'text-red-600' : ''
+                              : 'text-gray-400'
+                          }`}>
+                            {trade.type === 'trade' && trade.dailyGain !== null ? `${trade.dailyGain.toFixed(2)}%` : '-'}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-600">{trade.milestone || '-'}</td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => deleteTrade(trade.id)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -596,6 +792,18 @@ export default function ForexTracker() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Goal Advancement Info */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6">
+              <h3 className="text-lg font-semibold mb-2 text-green-800">🎯 Automatic Goal Advancement</h3>
+              <p className="text-green-700 mb-2">Goals automatically advance when targets are reached.</p>
+              <div className="text-sm text-green-600">
+                <p>• <strong>Auto-Complete:</strong> Current step marks as "Completed" when target is reached</p>
+                <p>• <strong>Auto-Advance:</strong> Next step automatically becomes "In Progress"</p>
+                <p>• <strong>Dashboard Update:</strong> Progress bars and targets update automatically</p>
+                <p>• <strong>Status Sync:</strong> All tabs stay synchronized with current progress</p>
               </div>
             </div>
           </div>
