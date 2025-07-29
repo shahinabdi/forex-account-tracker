@@ -7,23 +7,13 @@ export default function ForexTracker() {
   // Clean initial state - no pre-populated data
   const [summary, setSummary] = useState({
     latestBalance: 0,
-    targetStatus: 'Step1',
-    currentTarget: 150,
-    startForTarget: 15,
+    targetStatus: 'No Goals Set',
+    currentTarget: 0,
+    startForTarget: 0,
     progressToTarget: 0
   });
 
-  const [settings, setSettings] = useState([
-    { level: 'Step1', startBalance: 15, targetBalance: 150, status: 'In Progress', progress: '' },
-    { level: 'Step2', startBalance: 150, targetBalance: 1500, status: 'Not Started', progress: '' },
-    { level: 'Step3', startBalance: 1500, targetBalance: 3000, status: 'Not Started', progress: '' },
-    { level: 'Step4', startBalance: 3000, targetBalance: 9000, status: 'Not Started', progress: '' },
-    { level: 'Step5', startBalance: 9000, targetBalance: 15000, status: 'Not Started', progress: '' },
-    { level: 'Step6', startBalance: 15000, targetBalance: 30000, status: 'Not Started', progress: '' },
-    { level: 'Step7', startBalance: 30000, targetBalance: 50000, status: 'Not Started', progress: '' },
-    { level: 'Step8', startBalance: 50000, targetBalance: 150000, status: 'Not Started', progress: '' },
-    { level: 'Step9', startBalance: 150000, targetBalance: 255000, status: 'Not Started', progress: '' }
-  ]);
+  const [settings, setSettings] = useState([]);
 
   // Start with empty trading data
   const [tradingData, setTradingData] = useState([]);
@@ -75,7 +65,7 @@ export default function ForexTracker() {
 
   // Calculate derived values and auto-advance steps
   useEffect(() => {
-    if (tradingData.length > 0) {
+    if (tradingData.length > 0 && settings.length > 0) {
       const latest = tradingData[tradingData.length - 1];
       let currentStep = settings.find(s => s.status === 'In Progress');
       
@@ -110,26 +100,37 @@ export default function ForexTracker() {
         }));
       }
     } else {
-      // Reset to initial state when no data - including resetting all steps
-      const resetSettings = settings.map((setting, index) => ({
-        ...setting,
-        status: index === 0 ? 'In Progress' : 'Not Started'
-      }));
-      setSettings(resetSettings);
-      
-      setSummary({
-        latestBalance: 0,
-        targetStatus: 'Step1',
-        currentTarget: 150,
-        startForTarget: 15,
-        progressToTarget: 0
-      });
+      // Reset to initial state when no data or no goals
+      if (settings.length > 0) {
+        const resetSettings = settings.map((setting, index) => ({
+          ...setting,
+          status: index === 0 ? 'In Progress' : 'Not Started'
+        }));
+        setSettings(resetSettings);
+        
+        const firstGoal = resetSettings[0];
+        setSummary({
+          latestBalance: tradingData.length > 0 ? tradingData[tradingData.length - 1].balance : 0,
+          targetStatus: firstGoal.level,
+          currentTarget: firstGoal.targetBalance,
+          startForTarget: firstGoal.startBalance,
+          progressToTarget: 0
+        });
+      } else {
+        setSummary({
+          latestBalance: tradingData.length > 0 ? tradingData[tradingData.length - 1].balance : 0,
+          targetStatus: 'No Goals Set',
+          currentTarget: 0,
+          startForTarget: 0,
+          progressToTarget: 0
+        });
+      }
     }
-  }, [tradingData]);
+  }, [tradingData, settings]);
 
   // Recalculate amount to target for all entries whenever data or settings change
   useEffect(() => {
-    if (tradingData.length > 0) {
+    if (tradingData.length > 0 && settings.length > 0) {
       const currentStep = settings.find(s => s.status === 'In Progress');
       if (currentStep) {
         const updatedTradingData = tradingData.map(trade => ({
@@ -744,55 +745,63 @@ export default function ForexTracker() {
             {/* Goals Configuration */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-lg font-semibold mb-4">Trading Goals & Targets</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4">Goal</th>
-                      <th className="text-left py-3 px-4">Start Balance</th>
-                      <th className="text-left py-3 px-4">Target Balance</th>
-                      <th className="text-left py-3 px-4">Multiplier</th>
-                      <th className="text-left py-3 px-4">Profit Target</th>
-                      <th className="text-left py-3 px-4">Status</th>
-                      <th className="text-left py-3 px-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {settings.map((setting, index) => (
-                      <tr key={setting.level} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 font-semibold">{setting.level}</td>
-                        <td className="py-3 px-4">{formatCurrency(setting.startBalance)}</td>
-                        <td className="py-3 px-4">{formatCurrency(setting.targetBalance)}</td>
-                        <td className="py-3 px-4 font-semibold text-blue-600">
-                          {(setting.targetBalance / setting.startBalance).toFixed(1)}x
-                        </td>
-                        <td className="py-3 px-4 font-semibold text-green-600">
-                          {formatCurrency(setting.targetBalance - setting.startBalance)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            setting.status === 'In Progress' 
-                              ? 'bg-blue-100 text-blue-800' 
-                              : setting.status === 'Completed'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {setting.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => removeGoal(index)}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
+              {settings.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Target size={48} className="mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">No Goals Set Yet</p>
+                  <p>Add your first trading goal above to get started with target tracking.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4">Goal</th>
+                        <th className="text-left py-3 px-4">Start Balance</th>
+                        <th className="text-left py-3 px-4">Target Balance</th>
+                        <th className="text-left py-3 px-4">Multiplier</th>
+                        <th className="text-left py-3 px-4">Profit Target</th>
+                        <th className="text-left py-3 px-4">Status</th>
+                        <th className="text-left py-3 px-4">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {settings.map((setting, index) => (
+                        <tr key={setting.level} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 font-semibold">{setting.level}</td>
+                          <td className="py-3 px-4">{formatCurrency(setting.startBalance)}</td>
+                          <td className="py-3 px-4">{formatCurrency(setting.targetBalance)}</td>
+                          <td className="py-3 px-4 font-semibold text-blue-600">
+                            {(setting.targetBalance / setting.startBalance).toFixed(1)}x
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-green-600">
+                            {formatCurrency(setting.targetBalance - setting.startBalance)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              setting.status === 'In Progress' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : setting.status === 'Completed'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {setting.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => removeGoal(index)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Goal Advancement Info */}
