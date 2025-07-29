@@ -440,7 +440,12 @@ export default function ForexTracker() {
     XLSX.utils.book_append_sheet(wb, tradingWS, 'Trading Log');
     XLSX.utils.book_append_sheet(wb, settingsWS, 'Settings');
     
-    XLSX.writeFile(wb, 'Forex_Account_Tracker.xlsx');
+    // Generate filename with current date
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const filename = `Forex_Account_Tracker_${dateStr}.xlsx`;
+    
+    XLSX.writeFile(wb, filename);
   };
 
   const importData = async (event) => {
