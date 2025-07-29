@@ -33,6 +33,8 @@ export default function ForexTracker() {
     targetBalance: ''
   });
 
+  const [validationError, setValidationError] = useState('');
+
   // Load data from localStorage on component mount
   useEffect(() => {
     const savedSettings = localStorage.getItem('forexTracker_settings');
@@ -49,6 +51,43 @@ export default function ForexTracker() {
       setSummary(JSON.parse(savedSummary));
     }
   }, []);
+
+  // Force check advancement on initial load and whenever needed
+  const checkAndAdvanceSteps = () => {
+    if (tradingData.length > 0 && settings.length > 0) {
+      const latest = tradingData[tradingData.length - 1];
+      let needsUpdate = false;
+      let newSettings = [...settings];
+      
+      // Check if we need to advance through multiple steps
+      while (true) {
+        const currentStep = newSettings.find(s => s.status === 'In Progress');
+        if (!currentStep || latest.balance < currentStep.targetBalance) {
+          break; // No advancement needed
+        }
+        
+        // Mark current step as completed
+        const currentIndex = newSettings.findIndex(s => s.level === currentStep.level);
+        newSettings[currentIndex] = { ...newSettings[currentIndex], status: 'Completed' };
+        
+        // Activate next step if available
+        if (currentIndex + 1 < newSettings.length) {
+          newSettings[currentIndex + 1] = { ...newSettings[currentIndex + 1], status: 'In Progress' };
+          needsUpdate = true;
+        } else {
+          break; // No more steps
+        }
+      }
+      
+      if (needsUpdate) {
+        setSettings(newSettings);
+      }
+    }
+  };
+
+  useEffect(() => {
+    checkAndAdvanceSteps();
+  }, [tradingData.length, settings.length]); // Run when data loads
 
   // Save data to localStorage whenever state changes
   useEffect(() => {
@@ -68,27 +107,34 @@ export default function ForexTracker() {
     if (tradingData.length > 0 && settings.length > 0) {
       const latest = tradingData[tradingData.length - 1];
       let currentStep = settings.find(s => s.status === 'In Progress');
+      let hasAdvanced = false;
       
       // Check if current target is reached and advance to next step
       if (currentStep && latest.balance >= currentStep.targetBalance) {
-        const newSettings = settings.map(s => {
+        const currentIndex = settings.findIndex(s => s.level === currentStep.level);
+        
+        const newSettings = settings.map((s, index) => {
           if (s.level === currentStep.level) {
             return { ...s, status: 'Completed' };
+          }
+          // Activate next step if it exists
+          if (index === currentIndex + 1) {
+            return { ...s, status: 'In Progress' };
           }
           return s;
         });
         
-        // Find next step to activate
-        const currentIndex = settings.findIndex(s => s.level === currentStep.level);
-        if (currentIndex < settings.length - 1) {
-          newSettings[currentIndex + 1].status = 'In Progress';
-          currentStep = newSettings[currentIndex + 1];
-        }
-        
         setSettings(newSettings);
+        
+        // Update currentStep to the new active step
+        if (currentIndex < settings.length - 1) {
+          currentStep = newSettings[currentIndex + 1];
+          hasAdvanced = true;
+        }
       }
       
-      if (currentStep && latest.balance) {
+      // Update summary with current step info
+      if (currentStep) {
         const progress = Math.max(0, (latest.balance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance));
         setSummary(prev => ({
           ...prev,
@@ -98,6 +144,15 @@ export default function ForexTracker() {
           startForTarget: currentStep.startBalance,
           targetStatus: currentStep.level
         }));
+        
+        // If we advanced, also update the amount to target for all entries
+        if (hasAdvanced) {
+          const updatedTradingData = tradingData.map(trade => ({
+            ...trade,
+            amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
+          }));
+          setTradingData(updatedTradingData);
+        }
       }
     } else {
       // Reset to initial state when no data or no goals
@@ -126,7 +181,7 @@ export default function ForexTracker() {
         });
       }
     }
-  }, [tradingData, settings]);
+  }, [tradingData, settings.map(s => s.status).join(',')]); // Only depend on status changes to avoid infinite loops
 
   // Recalculate amount to target for all entries whenever data or settings change
   useEffect(() => {
@@ -160,7 +215,7 @@ export default function ForexTracker() {
   };
 
   const addNewTrade = () => {
-    if (newTrade.balance) {
+    if (newTrade.balance && settings.length > 0) {
       let prevBalance = 0;
       let pnl = 0;
       let dailyGain = 0;
@@ -228,13 +283,67 @@ export default function ForexTracker() {
     setTradingData(tradingData.filter(trade => trade.id !== id));
   };
 
+  const validateNewGoal = () => {
+    const startBalance = parseFloat(newGoal.startBalance);
+    const targetBalance = parseFloat(newGoal.targetBalance);
+    
+    // Clear previous errors
+    setValidationError('');
+    
+    // Basic validation
+    if (!newGoal.level || !newGoal.startBalance || !newGoal.targetBalance) {
+      setValidationError('All fields are required');
+      return false;
+    }
+    
+    if (isNaN(startBalance) || isNaN(targetBalance)) {
+      setValidationError('Start and target balances must be valid numbers');
+      return false;
+    }
+    
+    if (targetBalance <= startBalance) {
+      setValidationError('Target balance must be greater than start balance');
+      return false;
+    }
+    
+    // Check if goal name already exists
+    if (settings.some(s => s.level.toLowerCase() === newGoal.level.toLowerCase())) {
+      setValidationError('Goal name already exists');
+      return false;
+    }
+    
+    // Validate progression logic
+    if (settings.length > 0) {
+      const sortedSettings = [...settings].sort((a, b) => {
+        // Try to sort by step number if they follow Step1, Step2 pattern
+        const aNum = parseInt(a.level.replace(/\D/g, '')) || 0;
+        const bNum = parseInt(b.level.replace(/\D/g, '')) || 0;
+        if (aNum && bNum) return aNum - bNum;
+        // Otherwise sort alphabetically
+        return a.level.localeCompare(b.level);
+      });
+      
+      const lastGoal = sortedSettings[sortedSettings.length - 1];
+      
+      // Check if start balance matches the last goal's target
+      if (startBalance !== lastGoal.targetBalance) {
+        setValidationError(
+          `Start balance should be ${formatCurrency(lastGoal.targetBalance)} (matching ${lastGoal.level}'s target balance)`
+        );
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const addNewGoal = () => {
-    if (newGoal.level && newGoal.startBalance && newGoal.targetBalance) {
+    if (validateNewGoal()) {
       const goal = {
         level: newGoal.level,
         startBalance: parseFloat(newGoal.startBalance),
         targetBalance: parseFloat(newGoal.targetBalance),
-        status: 'Not Started',
+        status: settings.length === 0 ? 'In Progress' : 'Not Started', // First goal is active
         progress: ''
       };
 
@@ -244,12 +353,57 @@ export default function ForexTracker() {
         startBalance: '',
         targetBalance: ''
       });
+      setValidationError('');
+    }
+  };
+
+  // Auto-suggest next start balance based on last goal's target
+  const getNextStartBalance = () => {
+    if (settings.length > 0) {
+      const sortedSettings = [...settings].sort((a, b) => {
+        const aNum = parseInt(a.level.replace(/\D/g, '')) || 0;
+        const bNum = parseInt(b.level.replace(/\D/g, '')) || 0;
+        if (aNum && bNum) return aNum - bNum;
+        return a.level.localeCompare(b.level);
+      });
+      return sortedSettings[sortedSettings.length - 1].targetBalance.toString();
+    }
+    return '';
+  };
+
+  // Auto-suggest next goal name
+  const getNextGoalName = () => {
+    if (settings.length === 0) return 'Step1';
+    
+    const stepNumbers = settings
+      .map(s => parseInt(s.level.replace(/\D/g, '')))
+      .filter(num => !isNaN(num))
+      .sort((a, b) => a - b);
+    
+    if (stepNumbers.length > 0) {
+      return `Step${stepNumbers[stepNumbers.length - 1] + 1}`;
+    }
+    
+    return `Step${settings.length + 1}`;
+  };
+
+  // Update start balance when form is focused and it's empty
+  const handleStartBalanceFocus = () => {
+    if (!newGoal.startBalance && settings.length > 0) {
+      setNewGoal({...newGoal, startBalance: getNextStartBalance()});
+    }
+  };
+
+  const handleGoalNameFocus = () => {
+    if (!newGoal.level) {
+      setNewGoal({...newGoal, level: getNextGoalName()});
     }
   };
 
   const removeGoal = (index) => {
     const newSettings = settings.filter((_, i) => i !== index);
     setSettings(newSettings);
+    setValidationError(''); // Clear any validation errors
   };
 
   const exportData = () => {
@@ -418,6 +572,13 @@ export default function ForexTracker() {
                   className="hidden"
                 />
               </label>
+              <button
+                onClick={checkAndAdvanceSteps}
+                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Target size={16} />
+                Check Progress
+              </button>
             </div>
           </div>
         </div>
@@ -551,12 +712,17 @@ export default function ForexTracker() {
                   <TrendingUp size={48} className="mx-auto" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">No Trading Data Yet</h3>
-                <p className="text-gray-500 mb-4">Start by adding your first trade or initial balance in the Trading tab.</p>
+                <p className="text-gray-500 mb-4">
+                  {settings.length === 0 
+                    ? "First set up your goals in the Goals & Targets tab, then add your trading data here."
+                    : "Start by adding your first trade or initial balance in the Trading tab."
+                  }
+                </p>
                 <button
-                  onClick={() => setActiveTab('trading')}
+                  onClick={() => setActiveTab(settings.length === 0 ? 'goals' : 'trading')}
                   className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Go to Trading Tab
+                  {settings.length === 0 ? "Set Up Goals First" : "Go to Trading Tab"}
                 </button>
               </div>
             )}
@@ -642,7 +808,12 @@ export default function ForexTracker() {
               <h3 className="text-lg font-semibold mb-4">Trading History</h3>
               {tradingData.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No entries yet. Add your first entry above to get started.</p>
+                  <p>
+                    {settings.length === 0 
+                      ? "Set up your goals first, then add your trading entries here."
+                      : "No entries yet. Add your first entry above to get started."
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -710,35 +881,56 @@ export default function ForexTracker() {
             {/* Add New Goal */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-lg font-semibold mb-4">Add New Goal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  placeholder="Goal Name (e.g., Step10)"
-                  value={newGoal.level}
-                  onChange={(e) => setNewGoal({...newGoal, level: e.target.value})}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <input
-                  type="number"
-                  placeholder="Start Balance"
-                  value={newGoal.startBalance}
-                  onChange={(e) => setNewGoal({...newGoal, startBalance: e.target.value})}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <input
-                  type="number"
-                  placeholder="Target Balance"
-                  value={newGoal.targetBalance}
-                  onChange={(e) => setNewGoal({...newGoal, targetBalance: e.target.value})}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button
-                  onClick={addNewGoal}
-                  className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus size={16} />
-                  Add Goal
-                </button>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Goal Name (e.g., Step1)"
+                    value={newGoal.level}
+                    onChange={(e) => setNewGoal({...newGoal, level: e.target.value})}
+                    onFocus={handleGoalNameFocus}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Start Balance"
+                    value={newGoal.startBalance}
+                    onChange={(e) => setNewGoal({...newGoal, startBalance: e.target.value})}
+                    onFocus={handleStartBalanceFocus}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Target Balance"
+                    value={newGoal.targetBalance}
+                    onChange={(e) => setNewGoal({...newGoal, targetBalance: e.target.value})}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={addNewGoal}
+                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add Goal
+                  </button>
+                </div>
+                
+                {/* Validation Error */}
+                {validationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-600 text-sm font-medium">{validationError}</p>
+                  </div>
+                )}
+                
+                {/* Helper Text */}
+                {settings.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-blue-700 text-sm">
+                      <strong>💡 Tip:</strong> Next goal should start where the previous goal ends. 
+                      {settings.length > 0 && ` Expected start balance: ${formatCurrency(parseFloat(getNextStartBalance()) || 0)}`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
