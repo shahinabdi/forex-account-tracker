@@ -102,14 +102,14 @@ export default function ForexTracker() {
     localStorage.setItem('forexTracker_summary', JSON.stringify(summary));
   }, [summary]);
 
-  // Calculate derived values and auto-advance steps
+  // Calculate derived values and auto-advance/retreat steps
   useEffect(() => {
     if (tradingData.length > 0 && settings.length > 0) {
       const latest = tradingData[tradingData.length - 1];
       let currentStep = settings.find(s => s.status === 'In Progress');
-      let hasAdvanced = false;
+      let hasChanged = false;
       
-      // Check if current target is reached and advance to next step
+      // Check if we need to advance to next step
       if (currentStep && latest.balance >= currentStep.targetBalance) {
         const currentIndex = settings.findIndex(s => s.level === currentStep.level);
         
@@ -129,7 +129,36 @@ export default function ForexTracker() {
         // Update currentStep to the new active step
         if (currentIndex < settings.length - 1) {
           currentStep = newSettings[currentIndex + 1];
-          hasAdvanced = true;
+          hasChanged = true;
+        }
+      }
+      
+      // Check if we need to retreat to previous step (balance dropped below current step's start)
+      if (currentStep && latest.balance < currentStep.startBalance) {
+        const currentIndex = settings.findIndex(s => s.level === currentStep.level);
+        
+        // Only retreat if we're not already on the first step
+        if (currentIndex > 0) {
+          const newSettings = settings.map((s, index) => {
+            if (s.level === currentStep.level) {
+              return { ...s, status: 'Not Started' };
+            }
+            // Activate previous step
+            if (index === currentIndex - 1) {
+              return { ...s, status: 'In Progress' };
+            }
+            // Mark any steps after the previous one as "Not Started"
+            if (index > currentIndex - 1) {
+              return { ...s, status: 'Not Started' };
+            }
+            return s;
+          });
+          
+          setSettings(newSettings);
+          
+          // Update currentStep to the previous step
+          currentStep = newSettings[currentIndex - 1];
+          hasChanged = true;
         }
       }
       
@@ -145,8 +174,8 @@ export default function ForexTracker() {
           targetStatus: currentStep.level
         }));
         
-        // If we advanced, also update the amount to target for all entries
-        if (hasAdvanced) {
+        // If we changed steps, also update the amount to target for all entries
+        if (hasChanged) {
           const updatedTradingData = tradingData.map(trade => ({
             ...trade,
             amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
