@@ -378,6 +378,52 @@ export default function ForexTracker() {
     }
   };
 
+  // Auto-update P&L when balance changes during editing
+  const handleBalanceChange = (newBalance) => {
+    if (editingTrade && editingTrade.type === 'trade') {
+      const currentBalance = parseFloat(newBalance) || 0;
+      const tradeIndex = tradingData.findIndex(t => t.id === editingTrade.id);
+      const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
+      
+      // Auto-calculate P&L if it wasn't manually set
+      const autoPnL = currentBalance - prevBalance;
+      
+      setEditingTrade({
+        ...editingTrade,
+        balance: newBalance,
+        pnl: autoPnL.toString()
+      });
+    } else {
+      setEditingTrade({
+        ...editingTrade,
+        balance: newBalance
+      });
+    }
+  };
+
+  // Auto-update balance when P&L changes during editing
+  const handlePnLChange = (newPnL) => {
+    if (editingTrade && editingTrade.type === 'trade') {
+      const pnlValue = parseFloat(newPnL) || 0;
+      const tradeIndex = tradingData.findIndex(t => t.id === editingTrade.id);
+      const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
+      
+      // Auto-calculate balance based on P&L
+      const autoBalance = prevBalance + pnlValue;
+      
+      setEditingTrade({
+        ...editingTrade,
+        pnl: newPnL,
+        balance: autoBalance.toString()
+      });
+    } else {
+      setEditingTrade({
+        ...editingTrade,
+        pnl: newPnL
+      });
+    }
+  };
+
   const cancelEditing = () => {
     setEditingTrade(null);
   };
@@ -971,8 +1017,9 @@ export default function ForexTracker() {
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="number"
+                                step="0.01"
                                 value={editingTrade.balance}
-                                onChange={(e) => setEditingTrade({...editingTrade, balance: e.target.value})}
+                                onChange={(e) => handleBalanceChange(e.target.value)}
                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
                               />
                             ) : (
@@ -990,8 +1037,9 @@ export default function ForexTracker() {
                               editingTrade && editingTrade.id === trade.id ? (
                                 <input
                                   type="number"
+                                  step="0.01"
                                   value={editingTrade.pnl}
-                                  onChange={(e) => setEditingTrade({...editingTrade, pnl: e.target.value})}
+                                  onChange={(e) => handlePnLChange(e.target.value)}
                                   className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
                                   placeholder="Auto-calc"
                                 />
