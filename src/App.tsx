@@ -14,8 +14,6 @@ export default function ForexTracker() {
   });
 
   const [settings, setSettings] = useState([]);
-
-  // Start with empty trading data
   const [tradingData, setTradingData] = useState([]);
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,7 +22,7 @@ export default function ForexTracker() {
     balance: '',
     pnl: '',
     milestone: '',
-    type: 'trade' // 'trade', 'deposit', 'withdrawal', 'starting'
+    type: 'trade'
   });
 
   const [newGoal, setNewGoal] = useState({
@@ -33,7 +31,9 @@ export default function ForexTracker() {
     targetBalance: ''
   });
 
+  const [editingTrade, setEditingTrade] = useState(null);
   const [validationError, setValidationError] = useState('');
+  const [tradeValidationError, setTradeValidationError] = useState('');
 
   // Load data from localStorage on component mount
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function ForexTracker() {
 
   useEffect(() => {
     checkAndAdvanceSteps();
-  }, [tradingData.length, settings.length]); // Run when data loads
+  }, [tradingData.length, settings.length]);
 
   // Save data to localStorage whenever state changes
   useEffect(() => {
@@ -181,7 +181,7 @@ export default function ForexTracker() {
         });
       }
     }
-  }, [tradingData, settings.map(s => s.status).join(',')]); // Only depend on status changes to avoid infinite loops
+  }, [tradingData, settings.map(s => s.status).join(',')]);
 
   // Recalculate amount to target for all entries whenever data or settings change
   useEffect(() => {
@@ -207,15 +207,56 @@ export default function ForexTracker() {
 
   const calculateCorrectDailyGain = (currentBalance, previousBalance, type) => {
     if (type === 'deposit' || type === 'withdrawal' || type === 'starting') {
-      return 0; // No gain calculation for non-trading activities
+      return 0;
     }
     
     if (previousBalance <= 0) return 0;
     return ((currentBalance - previousBalance) / previousBalance) * 100;
   };
 
+  const validateTradeEntry = () => {
+    const selectedDate = newTrade.date;
+    const selectedType = newTrade.type;
+    
+    setTradeValidationError('');
+    
+    if (!newTrade.balance) {
+      setTradeValidationError('Balance is required');
+      return false;
+    }
+    
+    const sameeDateEntries = tradingData.filter(trade => trade.date === selectedDate);
+    
+    if (sameeDateEntries.length > 0) {
+      const hasTradeOnDate = sameeDateEntries.some(trade => trade.type === 'trade');
+      const hasStartingOnDate = sameeDateEntries.some(trade => trade.type === 'starting');
+      
+      if (selectedType === 'trade' && hasTradeOnDate) {
+        setTradeValidationError('Only one trade entry allowed per day');
+        return false;
+      }
+      
+      if (selectedType === 'starting' && hasStartingOnDate) {
+        setTradeValidationError('Only one starting balance entry allowed per day');
+        return false;
+      }
+      
+      if (selectedType === 'starting' && sameeDateEntries.length > 0) {
+        setTradeValidationError('Cannot add starting balance on a day with other entries');
+        return false;
+      }
+      
+      if ((selectedType === 'deposit' || selectedType === 'withdrawal' || selectedType === 'trade') && hasStartingOnDate) {
+        setTradeValidationError('Cannot add entries on a day with starting balance');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const addNewTrade = () => {
-    if (newTrade.balance && settings.length > 0) {
+    if (newTrade.balance && settings.length > 0 && validateTradeEntry()) {
       let prevBalance = 0;
       let pnl = 0;
       let dailyGain = 0;
@@ -230,18 +271,17 @@ export default function ForexTracker() {
 
       const currentBalance = parseFloat(newTrade.balance);
 
-      // Calculate P&L and daily gain based on type
       switch (newTrade.type) {
         case 'trade':
           pnl = parseFloat(newTrade.pnl) || (currentBalance - prevBalance);
           dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
           break;
         case 'deposit':
-          pnl = 0; // Deposits don't count as profit
+          pnl = 0;
           dailyGain = 0;
           break;
         case 'withdrawal':
-          pnl = 0; // Withdrawals don't count as loss
+          pnl = 0;
           dailyGain = 0;
           break;
         case 'starting':
@@ -276,7 +316,70 @@ export default function ForexTracker() {
         milestone: '',
         type: 'trade'
       });
+      setTradeValidationError('');
     }
+  };
+
+  const startEditingTrade = (trade) => {
+    setEditingTrade({
+      id: trade.id,
+      date: trade.date,
+      balance: trade.balance.toString(),
+      pnl: trade.pnl ? trade.pnl.toString() : '',
+      milestone: trade.milestone || '',
+      type: trade.type
+    });
+  };
+
+  const saveEditedTrade = () => {
+    if (editingTrade && editingTrade.balance) {
+      const updatedTradingData = tradingData.map(trade => {
+        if (trade.id === editingTrade.id) {
+          const currentBalance = parseFloat(editingTrade.balance);
+          
+          const tradeIndex = tradingData.findIndex(t => t.id === trade.id);
+          const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
+          
+          let pnl = 0;
+          let dailyGain = 0;
+          
+          switch (editingTrade.type) {
+            case 'trade':
+              pnl = parseFloat(editingTrade.pnl) || (currentBalance - prevBalance);
+              dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+              break;
+            case 'deposit':
+            case 'withdrawal':
+            case 'starting':
+              pnl = 0;
+              dailyGain = 0;
+              break;
+          }
+          
+          const currentStep = settings.find(s => s.status === 'In Progress');
+          const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
+          
+          return {
+            ...trade,
+            date: editingTrade.date,
+            balance: currentBalance,
+            pnl: pnl,
+            amountToTarget: amountToTarget,
+            dailyGain: dailyGain,
+            milestone: editingTrade.milestone,
+            type: editingTrade.type
+          };
+        }
+        return trade;
+      });
+      
+      setTradingData(updatedTradingData);
+      setEditingTrade(null);
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingTrade(null);
   };
 
   const deleteTrade = (id) => {
@@ -287,10 +390,8 @@ export default function ForexTracker() {
     const startBalance = parseFloat(newGoal.startBalance);
     const targetBalance = parseFloat(newGoal.targetBalance);
     
-    // Clear previous errors
     setValidationError('');
     
-    // Basic validation
     if (!newGoal.level || !newGoal.startBalance || !newGoal.targetBalance) {
       setValidationError('All fields are required');
       return false;
@@ -306,26 +407,21 @@ export default function ForexTracker() {
       return false;
     }
     
-    // Check if goal name already exists
     if (settings.some(s => s.level.toLowerCase() === newGoal.level.toLowerCase())) {
       setValidationError('Goal name already exists');
       return false;
     }
     
-    // Validate progression logic
     if (settings.length > 0) {
       const sortedSettings = [...settings].sort((a, b) => {
-        // Try to sort by step number if they follow Step1, Step2 pattern
         const aNum = parseInt(a.level.replace(/\D/g, '')) || 0;
         const bNum = parseInt(b.level.replace(/\D/g, '')) || 0;
         if (aNum && bNum) return aNum - bNum;
-        // Otherwise sort alphabetically
         return a.level.localeCompare(b.level);
       });
       
       const lastGoal = sortedSettings[sortedSettings.length - 1];
       
-      // Check if start balance matches the last goal's target
       if (startBalance !== lastGoal.targetBalance) {
         setValidationError(
           `Start balance should be ${formatCurrency(lastGoal.targetBalance)} (matching ${lastGoal.level}'s target balance)`
@@ -343,7 +439,7 @@ export default function ForexTracker() {
         level: newGoal.level,
         startBalance: parseFloat(newGoal.startBalance),
         targetBalance: parseFloat(newGoal.targetBalance),
-        status: settings.length === 0 ? 'In Progress' : 'Not Started', // First goal is active
+        status: settings.length === 0 ? 'In Progress' : 'Not Started',
         progress: ''
       };
 
@@ -357,7 +453,6 @@ export default function ForexTracker() {
     }
   };
 
-  // Auto-suggest next start balance based on last goal's target
   const getNextStartBalance = () => {
     if (settings.length > 0) {
       const sortedSettings = [...settings].sort((a, b) => {
@@ -371,7 +466,6 @@ export default function ForexTracker() {
     return '';
   };
 
-  // Auto-suggest next goal name
   const getNextGoalName = () => {
     if (settings.length === 0) return 'Step1';
     
@@ -387,7 +481,6 @@ export default function ForexTracker() {
     return `Step${settings.length + 1}`;
   };
 
-  // Update start balance when form is focused and it's empty
   const handleStartBalanceFocus = () => {
     if (!newGoal.startBalance && settings.length > 0) {
       setNewGoal({...newGoal, startBalance: getNextStartBalance()});
@@ -403,13 +496,12 @@ export default function ForexTracker() {
   const removeGoal = (index) => {
     const newSettings = settings.filter((_, i) => i !== index);
     setSettings(newSettings);
-    setValidationError(''); // Clear any validation errors
+    setValidationError('');
   };
 
   const exportData = () => {
     const wb = XLSX.utils.book_new();
     
-    // Create Trading Log sheet
     const tradingWS = XLSX.utils.aoa_to_sheet([
       [''],
       ['', 'Latest Balance', summary.latestBalance],
@@ -426,7 +518,6 @@ export default function ForexTracker() {
       ])
     ]);
 
-    // Create Settings sheet
     const settingsWS = XLSX.utils.json_to_sheet(settings.map(s => ({
       Level: s.level,
       StartBalance: s.startBalance,
@@ -440,9 +531,8 @@ export default function ForexTracker() {
     XLSX.utils.book_append_sheet(wb, tradingWS, 'Trading Log');
     XLSX.utils.book_append_sheet(wb, settingsWS, 'Settings');
     
-    // Generate filename with current date
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const dateStr = today.toISOString().split('T')[0];
     const filename = `Forex_Account_Tracker_${dateStr}.xlsx`;
     
     XLSX.writeFile(wb, filename);
@@ -454,7 +544,6 @@ export default function ForexTracker() {
       const data = await file.arrayBuffer();
       const wb = XLSX.read(data);
       
-      // Import trading data
       const tradingSheet = wb.Sheets['Trading Log'];
       if (tradingSheet) {
         const importedData = XLSX.utils.sheet_to_json(tradingSheet, { range: 8 });
@@ -474,7 +563,6 @@ export default function ForexTracker() {
         setTradingData(processedData);
       }
 
-      // Import settings
       const settingsSheet = wb.Sheets['Settings'];
       if (settingsSheet) {
         const importedSettings = XLSX.utils.sheet_to_json(settingsSheet);
@@ -529,7 +617,6 @@ export default function ForexTracker() {
     }
   };
 
-  // Chart data preparation
   const balanceChartData = tradingData.map(trade => ({
     date: formatDate(trade.date),
     balance: trade.balance,
@@ -806,6 +893,26 @@ export default function ForexTracker() {
                   Add Entry
                 </button>
               </div>
+              
+              {/* Trade Validation Error */}
+              {tradeValidationError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
+                  <p className="text-red-600 text-sm font-medium">{tradeValidationError}</p>
+                </div>
+              )}
+              
+              {/* Helper Text for Date Rules */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
+                <p className="text-amber-700 text-sm">
+                  <strong>📅 Date Rules:</strong>
+                </p>
+                <div className="text-xs text-amber-600 mt-1">
+                  <p>• Only 1 trade per day allowed</p>
+                  <p>• Starting balance cannot be mixed with other entries on same day</p>
+                  <p>• Multiple deposits/withdrawals per day are allowed</p>
+                  <p>• One trade + deposits/withdrawals on same day is allowed</p>
+                </div>
+              </div>
             </div>
 
             {/* Trading History */}
@@ -844,16 +951,60 @@ export default function ForexTracker() {
                               <span className="text-sm">{getTypeLabel(trade.type)}</span>
                             </div>
                           </td>
-                          <td className="py-3 px-4">{formatDate(trade.date)}</td>
-                          <td className="py-3 px-4 font-semibold">{formatCurrency(trade.balance)}</td>
+                          
+                          {/* Editable Date */}
+                          <td className="py-3 px-4">
+                            {editingTrade && editingTrade.id === trade.id ? (
+                              <input
+                                type="date"
+                                value={editingTrade.date}
+                                onChange={(e) => setEditingTrade({...editingTrade, date: e.target.value})}
+                                className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                              />
+                            ) : (
+                              formatDate(trade.date)
+                            )}
+                          </td>
+                          
+                          {/* Editable Balance */}
+                          <td className="py-3 px-4 font-semibold">
+                            {editingTrade && editingTrade.id === trade.id ? (
+                              <input
+                                type="number"
+                                value={editingTrade.balance}
+                                onChange={(e) => setEditingTrade({...editingTrade, balance: e.target.value})}
+                                className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+                              />
+                            ) : (
+                              formatCurrency(trade.balance)
+                            )}
+                          </td>
+                          
+                          {/* Editable P&L */}
                           <td className={`py-3 px-4 font-semibold ${
                             trade.type === 'trade' 
                               ? trade.pnl > 0 ? 'text-green-600' : trade.pnl < 0 ? 'text-red-600' : ''
                               : 'text-gray-400'
                           }`}>
-                            {trade.type === 'trade' && trade.pnl !== null ? formatCurrency(trade.pnl) : '-'}
+                            {trade.type === 'trade' ? (
+                              editingTrade && editingTrade.id === trade.id ? (
+                                <input
+                                  type="number"
+                                  value={editingTrade.pnl}
+                                  onChange={(e) => setEditingTrade({...editingTrade, pnl: e.target.value})}
+                                  className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+                                  placeholder="Auto-calc"
+                                />
+                              ) : (
+                                trade.pnl !== null ? formatCurrency(trade.pnl) : '-'
+                              )
+                            ) : (
+                              '-'
+                            )}
                           </td>
+                          
                           <td className="py-3 px-4">{formatCurrency(trade.amountToTarget)}</td>
+                          
                           <td className={`py-3 px-4 font-semibold ${
                             trade.type === 'trade' 
                               ? trade.dailyGain > 0 ? 'text-green-600' : trade.dailyGain < 0 ? 'text-red-600' : ''
@@ -861,14 +1012,60 @@ export default function ForexTracker() {
                           }`}>
                             {trade.type === 'trade' && trade.dailyGain !== null ? `${trade.dailyGain.toFixed(2)}%` : '-'}
                           </td>
-                          <td className="py-3 px-4 text-sm text-gray-600">{trade.milestone || '-'}</td>
+                          
+                          {/* Editable Milestone */}
+                          <td className="py-3 px-4 text-sm text-gray-600">
+                            {editingTrade && editingTrade.id === trade.id ? (
+                              <input
+                                type="text"
+                                value={editingTrade.milestone}
+                                onChange={(e) => setEditingTrade({...editingTrade, milestone: e.target.value})}
+                                className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
+                                placeholder="Milestone"
+                              />
+                            ) : (
+                              trade.milestone || '-'
+                            )}
+                          </td>
+                          
                           <td className="py-3 px-4">
-                            <button
-                              onClick={() => deleteTrade(trade.id)}
-                              className="text-red-600 hover:text-red-800 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {editingTrade && editingTrade.id === trade.id ? (
+                                <>
+                                  <button
+                                    onClick={saveEditedTrade}
+                                    className="text-green-600 hover:text-green-800 transition-colors"
+                                    title="Save changes"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={cancelEditing}
+                                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                                    title="Cancel editing"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => startEditingTrade(trade)}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    title="Edit entry"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => deleteTrade(trade.id)}
+                                    className="text-red-600 hover:text-red-800 transition-colors"
+                                    title="Delete entry"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
