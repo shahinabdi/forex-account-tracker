@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -913,7 +913,7 @@ export default function ForexTracker() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value) => formatCurrency(value)}
+                        formatter={(value) => [formatCurrency(value), 'P&L']}
                         labelStyle={{ color: '#374151' }}
                         contentStyle={{ 
                           backgroundColor: '#f9fafb',
@@ -922,14 +922,13 @@ export default function ForexTracker() {
                         }}
                       />
                       <Bar 
-                        dataKey="pnl" 
-                        fill={(entry) => entry?.pnl >= 0 ? '#10b981' : '#ef4444'}
-                        shape={(props) => {
-                          const { fill, ...rest } = props;
-                          const color = props.payload?.pnl >= 0 ? '#10b981' : '#ef4444';
-                          return <rect {...rest} fill={color} />;
-                        }}
-                      />
+                        dataKey="pnl"
+                        fill="#10b981"
+                      >
+                        {pnlChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
