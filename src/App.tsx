@@ -185,6 +185,7 @@ export default function ForexTracker() {
     }
   }, [tradingData, settings.map(s => s.status).join(',')]);
 
+  // Force recalculate all data when something changes
   useEffect(() => {
     if (tradingData.length > 0 && settings.length > 0) {
       const currentStep = settings.find(s => s.status === 'In Progress');
@@ -198,10 +199,25 @@ export default function ForexTracker() {
           trade.amountToTarget !== tradingData[index].amountToTarget
         );
         
-        if (hasChanges) setTradingData(updatedTradingData);
+        if (hasChanges) {
+          setTradingData(updatedTradingData);
+        }
+
+        // Force summary update with latest data
+        const latest = tradingData[tradingData.length - 1];
+        if (latest) {
+          const progress = Math.max(0, (latest.balance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance));
+          setSummary({
+            latestBalance: latest.balance,
+            progressToTarget: Math.min(progress, 1),
+            currentTarget: currentStep.targetBalance,
+            startForTarget: currentStep.startBalance,
+            targetStatus: currentStep.level
+          });
+        }
       }
     }
-  }, [settings]);
+  }, [settings, tradingData.length]);
 
   const calculateCorrectDailyGain = (currentBalance, previousBalance, type) => {
     if (type === 'deposit' || type === 'withdrawal' || type === 'starting') {
@@ -717,7 +733,8 @@ export default function ForexTracker() {
     .map(trade => ({
       date: formatDate(trade.date),
       pnl: trade.pnl,
-      dailyGain: trade.dailyGain
+      dailyGain: trade.dailyGain,
+      fill: trade.pnl >= 0 ? '#10b981' : '#ef4444' // Green for positive, Red for negative
     }));
 
   const getStatusBadgeClass = (status) => {
@@ -895,8 +912,24 @@ export default function ForexTracker() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
                       <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                      <Bar dataKey="pnl" fill="#10b981" />
+                      <Tooltip 
+                        formatter={(value) => formatCurrency(value)}
+                        labelStyle={{ color: '#374151' }}
+                        contentStyle={{ 
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Bar 
+                        dataKey="pnl" 
+                        fill={(entry) => entry?.pnl >= 0 ? '#10b981' : '#ef4444'}
+                        shape={(props) => {
+                          const { fill, ...rest } = props;
+                          const color = props.payload?.pnl >= 0 ? '#10b981' : '#ef4444';
+                          return <rect {...rest} fill={color} />;
+                        }}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
