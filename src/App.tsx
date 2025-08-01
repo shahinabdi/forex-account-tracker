@@ -898,7 +898,15 @@ export default function ForexTracker() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
                       <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
+                      <Tooltip 
+                        formatter={(value, name) => [formatCurrency(value), name === 'balance' ? 'Balance' : 'Target']}
+                        labelStyle={{ color: '#374151' }}
+                        contentStyle={{ 
+                          backgroundColor: '#f9fafb',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
                       <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} />
                       <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} />
                     </LineChart>
@@ -913,13 +921,21 @@ export default function ForexTracker() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value) => [formatCurrency(value), 'P&L']}
+                        formatter={(value, name) => {
+                          if (name === 'P&L') {
+                            return [formatCurrency(value), 'P&L'];
+                          }
+                          return [formatCurrency(value), name];
+                        }}
                         labelStyle={{ color: '#374151' }}
                         contentStyle={{ 
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px'
                         }}
+                        itemStyle={(value, name, props) => ({
+                          color: props.payload?.pnl >= 0 ? '#10b981' : '#ef4444'
+                        })}
                       />
                       <Bar 
                         dataKey="pnl"
