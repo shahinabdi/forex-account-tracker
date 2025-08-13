@@ -835,11 +835,19 @@ export default function ForexTracker() {
   // Get completed step targets for reference lines
   const completedSteps = settings.filter(s => s.status === 'Completed');
   
+  // Prepare deposits and withdrawals for markers
+  const deposits = tradingData.filter(trade => trade.type === 'deposit');
+  const withdrawals = tradingData.filter(trade => trade.type === 'withdrawal');
+  
   const balanceChartData = tradingData.map(trade => {
     const dataPoint: any = {
       date: formatDate(trade.date),
       balance: trade.balance,
-      target: summary.currentTarget
+      target: summary.currentTarget,
+      // Add markers for deposits and withdrawals
+      isDeposit: trade.type === 'deposit',
+      isWithdrawal: trade.type === 'withdrawal',
+      entryType: trade.type
     };
     
     // Add completed step reference lines
@@ -1021,19 +1029,81 @@ export default function ForexTracker() {
                       <YAxis />
                       <Tooltip
                         formatter={(value: any, name: any) => {
-                          if (name === 'balance') return [formatCurrency(value), 'Current Balance'];
-                          if (name === 'target') return [formatCurrency(value), 'Current Target'];
+                          if (name === 'balance') return [formatCurrency(Number(value)), 'Current Balance'];
+                          if (name === 'target') return [formatCurrency(Number(value)), 'Current Target'];
                           if (name.startsWith('completed_')) {
                             const stepName = name.replace('completed_', '');
-                            return [formatCurrency(value), `✓ ${stepName} (Completed)`];
+                            return [formatCurrency(Number(value)), `✓ ${stepName} (Completed)`];
                           }
-                          return [formatCurrency(value), name];
+                          return [formatCurrency(Number(value)), name];
                         }}
                         labelStyle={{ color: '#374151' }}
                         contentStyle={{
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px'
+                        }}
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const dataPoint = payload[0].payload;
+                            const isDeposit = dataPoint.isDeposit;
+                            const isWithdrawal = dataPoint.isWithdrawal;
+                            const entryType = dataPoint.entryType;
+                            
+                            return (
+                              <div
+                                style={{
+                                  backgroundColor: '#f9fafb',
+                                  border: '1px solid #e5e7eb',
+                                  borderRadius: '8px',
+                                  padding: '12px'
+                                }}
+                              >
+                                <p style={{ color: '#374151', margin: 0, marginBottom: '8px', fontWeight: 'bold' }}>
+                                  {label}
+                                </p>
+                                
+                                {payload.map((entry: any, index: number) => {
+                                  if (entry.dataKey === 'balance') {
+                                    return (
+                                      <div key={index}>
+                                        <p style={{ color: '#3b82f6', margin: 0, fontWeight: '600' }}>
+                                          Balance: {formatCurrency(Number(entry.value))}
+                                        </p>
+                                        {isDeposit && (
+                                          <p style={{ color: '#10b981', margin: 0, fontSize: '12px', marginTop: '4px' }}>
+                                            💰 Deposit made
+                                          </p>
+                                        )}
+                                        {isWithdrawal && (
+                                          <p style={{ color: '#ef4444', margin: 0, fontSize: '12px', marginTop: '4px' }}>
+                                            💸 Withdrawal made
+                                          </p>
+                                        )}
+                                        {entryType === 'starting' && (
+                                          <p style={{ color: '#8b5cf6', margin: 0, fontSize: '12px', marginTop: '4px' }}>
+                                            🎯 Starting balance
+                                          </p>
+                                        )}
+                                        {entryType === 'trade' && (
+                                          <p style={{ color: '#6b7280', margin: 0, fontSize: '12px', marginTop: '4px' }}>
+                                            📈 Trading activity
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })}
+                                
+                                {/* Show current target */}
+                                <p style={{ color: '#ef4444', margin: 0, fontSize: '11px', marginTop: '6px' }}>
+                                  🎯 Target: {formatCurrency(summary.currentTarget)}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
                       />
                       <Legend 
@@ -1048,8 +1118,64 @@ export default function ForexTracker() {
                           return value;
                         }}
                       />
-                      <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} name="balance" />
-                      <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} name="target" />
+                      <Line 
+                        type="monotone" 
+                        dataKey="balance" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3} 
+                        name="balance"
+                        dot={(props: any) => {
+                          const { cx, cy, payload } = props;
+                          if (payload.isDeposit) {
+                            return (
+                              <circle 
+                                cx={cx} 
+                                cy={cy} 
+                                r={6} 
+                                fill="#10b981" 
+                                stroke="#ffffff" 
+                                strokeWidth={2}
+                              />
+                            );
+                          }
+                          if (payload.isWithdrawal) {
+                            return (
+                              <circle 
+                                cx={cx} 
+                                cy={cy} 
+                                r={6} 
+                                fill="#ef4444" 
+                                stroke="#ffffff" 
+                                strokeWidth={2}
+                              />
+                            );
+                          }
+                          if (payload.entryType === 'starting') {
+                            return (
+                              <circle 
+                                cx={cx} 
+                                cy={cy} 
+                                r={5} 
+                                fill="#8b5cf6" 
+                                stroke="#ffffff" 
+                                strokeWidth={2}
+                              />
+                            );
+                          }
+                          // Default dot for trades - smaller and less prominent
+                          return (
+                            <circle 
+                              cx={cx} 
+                              cy={cy} 
+                              r={3} 
+                              fill="#3b82f6" 
+                              stroke="#ffffff" 
+                              strokeWidth={1}
+                            />
+                          );
+                        }}
+                      />
+                      <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} name="target" dot={false} />
                       
                       {/* Reference lines for completed steps */}
                       {completedSteps.map((step) => (
@@ -1062,24 +1188,51 @@ export default function ForexTracker() {
                           strokeWidth={1.5}
                           strokeOpacity={0.6}
                           name={`completed_${step.level}`}
+                          dot={false}
                         />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
                   
                   {/* Legend explanation */}
-                  {completedSteps.length > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-700 font-medium mb-1">Completed Milestones:</p>
-                      <div className="text-xs text-green-600">
-                        {completedSteps.map(step => (
-                          <span key={step.level} className="inline-block mr-4">
-                            ✓ {step.level}: {formatCurrency(step.targetBalance)}
-                          </span>
-                        ))}
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Completed milestones */}
+                    {completedSteps.length > 0 && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm text-green-700 font-medium mb-1">Completed Milestones:</p>
+                        <div className="text-xs text-green-600">
+                          {completedSteps.map(step => (
+                            <span key={step.level} className="inline-block mr-4">
+                              ✓ {step.level}: {formatCurrency(step.targetBalance)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Chart markers legend */}
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700 font-medium mb-2">Chart Markers:</p>
+                      <div className="text-xs text-blue-600 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <span>💰 Deposits</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span>💸 Withdrawals</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <span>🎯 Starting Balance</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          <span>📈 Trading Activity</span>
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6">
