@@ -15,7 +15,7 @@ export default function ForexTracker() {
   const [settings, setSettings] = useState([]);
   const [tradingData, setTradingData] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+
   const [newTrade, setNewTrade] = useState({
     date: new Date().toISOString().split('T')[0],
     balance: '',
@@ -63,16 +63,16 @@ export default function ForexTracker() {
       const latest = tradingData[tradingData.length - 1];
       let needsUpdate = false;
       let newSettings = [...settings];
-      
+
       while (true) {
         const currentStep = newSettings.find(s => s.status === 'In Progress');
         if (!currentStep || latest.balance < currentStep.targetBalance) {
           break;
         }
-        
+
         const currentIndex = newSettings.findIndex(s => s.level === currentStep.level);
         newSettings[currentIndex] = { ...newSettings[currentIndex], status: 'Completed' };
-        
+
         if (currentIndex + 1 < newSettings.length) {
           newSettings[currentIndex + 1] = { ...newSettings[currentIndex + 1], status: 'In Progress' };
           needsUpdate = true;
@@ -80,7 +80,7 @@ export default function ForexTracker() {
           break;
         }
       }
-      
+
       if (needsUpdate) setSettings(newSettings);
     }
   };
@@ -94,10 +94,10 @@ export default function ForexTracker() {
       const latest = tradingData[tradingData.length - 1];
       let currentStep = settings.find(s => s.status === 'In Progress');
       let hasChanged = false;
-      
+
       if (currentStep && latest.balance >= currentStep.targetBalance) {
         const currentIndex = settings.findIndex(s => s.level === currentStep.level);
-        
+
         const newSettings = settings.map((s, index) => {
           if (s.level === currentStep.level) {
             return { ...s, status: 'Completed' };
@@ -107,18 +107,18 @@ export default function ForexTracker() {
           }
           return s;
         });
-        
+
         setSettings(newSettings);
-        
+
         if (currentIndex < settings.length - 1) {
           currentStep = newSettings[currentIndex + 1];
           hasChanged = true;
         }
       }
-      
+
       if (currentStep && latest.balance < currentStep.startBalance) {
         const currentIndex = settings.findIndex(s => s.level === currentStep.level);
-        
+
         if (currentIndex > 0) {
           const newSettings = settings.map((s, index) => {
             if (s.level === currentStep.level) {
@@ -132,13 +132,13 @@ export default function ForexTracker() {
             }
             return s;
           });
-          
+
           setSettings(newSettings);
           currentStep = newSettings[currentIndex - 1];
           hasChanged = true;
         }
       }
-      
+
       if (currentStep) {
         const progress = Math.max(0, (latest.balance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance));
         setSummary({
@@ -148,7 +148,7 @@ export default function ForexTracker() {
           startForTarget: currentStep.startBalance,
           targetStatus: currentStep.level
         });
-        
+
         if (hasChanged) {
           const updatedTradingData = tradingData.map(trade => ({
             ...trade,
@@ -164,7 +164,7 @@ export default function ForexTracker() {
           status: index === 0 ? 'In Progress' : 'Not Started'
         }));
         setSettings(resetSettings);
-        
+
         const firstGoal = resetSettings[0];
         setSummary({
           latestBalance: tradingData.length > 0 ? tradingData[tradingData.length - 1].balance : 0,
@@ -194,11 +194,11 @@ export default function ForexTracker() {
           ...trade,
           amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
         }));
-        
-        const hasChanges = updatedTradingData.some((trade, index) => 
+
+        const hasChanges = updatedTradingData.some((trade, index) =>
           trade.amountToTarget !== tradingData[index].amountToTarget
         );
-        
+
         if (hasChanges) {
           setTradingData(updatedTradingData);
         }
@@ -232,21 +232,21 @@ export default function ForexTracker() {
       // For deposits/withdrawals, the value represents the amount to add/subtract
       const amount = parseFloat(value) || 0;
       let currentBalance = 0;
-      
+
       if (tradingData.length > 0) {
         currentBalance = tradingData[tradingData.length - 1].balance;
       } else {
         const currentStep = settings.find(s => s.status === 'In Progress');
         currentBalance = currentStep ? currentStep.startBalance : 0;
       }
-      
+
       let newBalance;
       if (newTrade.type === 'deposit') {
         newBalance = currentBalance + amount;
       } else { // withdrawal
         newBalance = currentBalance - amount;
       }
-      
+
       setNewTrade({
         ...newTrade,
         balance: newBalance.toString(),
@@ -258,14 +258,14 @@ export default function ForexTracker() {
 
     if (newTrade.type === 'starting') {
       // Starting balance is set directly
-      setNewTrade({...newTrade, balance: value, pnl: ''});
+      setNewTrade({ ...newTrade, balance: value, pnl: '' });
       return;
     }
 
     if (newTrade.type === 'trade') {
       const numValue = parseFloat(value) || 0;
       let prevBalance = 0;
-      
+
       if (tradingData.length > 0) {
         prevBalance = tradingData[tradingData.length - 1].balance;
       } else {
@@ -296,41 +296,41 @@ export default function ForexTracker() {
   const validateTradeEntry = () => {
     const selectedDate = newTrade.date;
     const selectedType = newTrade.type;
-    
+
     setTradeValidationError('');
-    
+
     if (selectedType === 'trade' && !newTrade.balance && !newTrade.pnl) {
       setTradeValidationError('Either balance or P&L is required for trades');
       return false;
     }
-    
+
     if (selectedType !== 'trade' && !newTrade.balance) {
       setTradeValidationError('Balance is required');
       return false;
     }
-    
+
     const sameeDateEntries = tradingData.filter(trade => trade.date === selectedDate);
-    
+
     if (sameeDateEntries.length > 0) {
       const hasTradeOnDate = sameeDateEntries.some(trade => trade.type === 'trade');
       const hasStartingOnDate = sameeDateEntries.some(trade => trade.type === 'starting');
-      
+
       if (selectedType === 'trade' && hasTradeOnDate) {
         setTradeValidationError('Only one trade entry allowed per day');
         return false;
       }
-      
+
       if (selectedType === 'starting' && hasStartingOnDate) {
         setTradeValidationError('Only one starting balance entry allowed per day');
         return false;
       }
-      
+
       if (selectedType === 'starting' && (hasTradeOnDate || sameeDateEntries.some(trade => ['deposit', 'withdrawal'].includes(trade.type)))) {
         setTradeValidationError('Cannot add starting balance on a day with existing trades, deposits, or withdrawals');
         return false;
       }
     }
-    
+
     return true;
   };
 
@@ -406,7 +406,7 @@ export default function ForexTracker() {
       const tradeIndex = tradingData.findIndex(t => t.id === editingTrade.id);
       const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
       const autoPnL = currentBalance - prevBalance;
-      
+
       setEditingTrade({
         ...editingTrade,
         balance: newBalance,
@@ -426,7 +426,7 @@ export default function ForexTracker() {
       const tradeIndex = tradingData.findIndex(t => t.id === editingTrade.id);
       const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
       const autoBalance = prevBalance + pnlValue;
-      
+
       setEditingTrade({
         ...editingTrade,
         pnl: newPnL,
@@ -447,10 +447,10 @@ export default function ForexTracker() {
           const currentBalance = parseFloat(editingTrade.balance);
           const tradeIndex = tradingData.findIndex(t => t.id === trade.id);
           const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
-          
+
           let pnl = 0;
           let dailyGain = 0;
-          
+
           switch (editingTrade.type) {
             case 'trade':
               pnl = parseFloat(editingTrade.pnl) || (currentBalance - prevBalance);
@@ -460,10 +460,10 @@ export default function ForexTracker() {
               pnl = 0;
               dailyGain = 0;
           }
-          
+
           const currentStep = settings.find(s => s.status === 'In Progress');
           const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
-          
+
           return {
             ...trade,
             date: editingTrade.date,
@@ -477,7 +477,7 @@ export default function ForexTracker() {
         }
         return trade;
       });
-      
+
       setTradingData(updatedTradingData);
       setEditingTrade(null);
     }
@@ -494,29 +494,29 @@ export default function ForexTracker() {
   const validateNewGoal = () => {
     const startBalance = parseFloat(newGoal.startBalance);
     const targetBalance = parseFloat(newGoal.targetBalance);
-    
+
     setValidationError('');
-    
+
     if (!newGoal.level || !newGoal.startBalance || !newGoal.targetBalance) {
       setValidationError('All fields are required');
       return false;
     }
-    
+
     if (isNaN(startBalance) || isNaN(targetBalance)) {
       setValidationError('Start and target balances must be valid numbers');
       return false;
     }
-    
+
     if (targetBalance <= startBalance) {
       setValidationError('Target balance must be greater than start balance');
       return false;
     }
-    
+
     if (settings.some(s => s.level.toLowerCase() === newGoal.level.toLowerCase())) {
       setValidationError('Goal name already exists');
       return false;
     }
-    
+
     if (settings.length > 0) {
       const sortedSettings = [...settings].sort((a, b) => {
         const aNum = parseInt(a.level.replace(/\D/g, '')) || 0;
@@ -524,17 +524,17 @@ export default function ForexTracker() {
         if (aNum && bNum) return aNum - bNum;
         return a.level.localeCompare(b.level);
       });
-      
+
       const lastGoal = sortedSettings[sortedSettings.length - 1];
       const expectedBalance = formatCurrency(lastGoal.targetBalance);
       const goalName = lastGoal.level;
-      
+
       if (startBalance !== lastGoal.targetBalance) {
         setValidationError('Start balance should be ' + expectedBalance + ' (matching ' + goalName + ' target balance)');
         return false;
       }
     }
-    
+
     return true;
   };
 
@@ -573,28 +573,28 @@ export default function ForexTracker() {
 
   const getNextGoalName = () => {
     if (settings.length === 0) return 'Step1';
-    
+
     const stepNumbers = settings
       .map(s => parseInt(s.level.replace(/\D/g, '')))
       .filter(num => !isNaN(num))
       .sort((a, b) => a - b);
-    
+
     if (stepNumbers.length > 0) {
       return 'Step' + (stepNumbers[stepNumbers.length - 1] + 1);
     }
-    
+
     return 'Step' + (settings.length + 1);
   };
 
   const handleStartBalanceFocus = () => {
     if (!newGoal.startBalance && settings.length > 0) {
-      setNewGoal({...newGoal, startBalance: getNextStartBalance()});
+      setNewGoal({ ...newGoal, startBalance: getNextStartBalance() });
     }
   };
 
   const handleGoalNameFocus = () => {
     if (!newGoal.level) {
-      setNewGoal({...newGoal, level: getNextGoalName()});
+      setNewGoal({ ...newGoal, level: getNextGoalName() });
     }
   };
 
@@ -606,7 +606,7 @@ export default function ForexTracker() {
 
   const exportData = () => {
     const wb = XLSX.utils.book_new();
-    
+
     const tradingWS = XLSX.utils.aoa_to_sheet([
       [''],
       ['', 'Latest Balance', summary.latestBalance],
@@ -618,7 +618,7 @@ export default function ForexTracker() {
       [''],
       ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value'],
       ...tradingData.map(trade => [
-        trade.date, trade.balance, trade.pnl, trade.amountToTarget, 
+        trade.date, trade.balance, trade.pnl, trade.amountToTarget,
         trade.dailyGain, trade.type, trade.milestone, trade.milestoneValue
       ])
     ]);
@@ -635,11 +635,11 @@ export default function ForexTracker() {
 
     XLSX.utils.book_append_sheet(wb, tradingWS, 'Trading Log');
     XLSX.utils.book_append_sheet(wb, settingsWS, 'Settings');
-    
+
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     const filename = 'Forex_Account_Tracker_' + dateStr + '.xlsx';
-    
+
     XLSX.writeFile(wb, filename);
   };
 
@@ -648,7 +648,7 @@ export default function ForexTracker() {
     if (file) {
       const data = await file.arrayBuffer();
       const wb = XLSX.read(data);
-      
+
       const tradingSheet = wb.Sheets['Trading Log'];
       if (tradingSheet) {
         const importedData = XLSX.utils.sheet_to_json(tradingSheet, { range: 8 });
@@ -808,11 +808,10 @@ export default function ForexTracker() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-4 font-medium capitalize rounded-t-xl transition-colors ${
-                  activeTab === tab
+                className={`px-6 py-4 font-medium capitalize rounded-t-xl transition-colors ${activeTab === tab
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 hover:text-blue-600'
-                }`}
+                  }`}
               >
                 {tab === 'goals' ? 'Goals & Targets' : tab}
               </button>
@@ -898,10 +897,10 @@ export default function ForexTracker() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => [formatCurrency(value), name === 'balance' ? 'Balance' : 'Target']}
                         labelStyle={{ color: '#374151' }}
-                        contentStyle={{ 
+                        contentStyle={{
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px'
@@ -920,7 +919,7 @@ export default function ForexTracker() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => {
                           if (name === 'P&L') {
                             return [formatCurrency(value), 'P&L'];
@@ -928,16 +927,44 @@ export default function ForexTracker() {
                           return [formatCurrency(value), name];
                         }}
                         labelStyle={{ color: '#374151' }}
-                        contentStyle={{ 
+                        contentStyle={{
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
                           borderRadius: '8px'
                         }}
-                        itemStyle={(value, name, props) => ({
-                          color: props.payload?.pnl >= 0 ? '#10b981' : '#ef4444'
-                        })}
+                        // Fixed: Custom content with dynamic colors
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0];
+                            const pnlValue = data.value;
+                            const isPositive = pnlValue >= 0;
+
+                            return (
+                              <div
+                                style={{
+                                  backgroundColor: '#f9fafb',
+                                  border: '1px solid #e5e7eb',
+                                  borderRadius: '8px',
+                                  padding: '8px 12px'
+                                }}
+                              >
+                                <p style={{ color: '#374151', margin: 0, marginBottom: '4px' }}>
+                                  {label}
+                                </p>
+                                <p style={{
+                                  color: isPositive ? '#10b981' : '#ef4444',
+                                  margin: 0,
+                                  fontWeight: '600'
+                                }}>
+                                  P&L: {formatCurrency(pnlValue)}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
-                      <Bar 
+                      <Bar
                         dataKey="pnl"
                         fill="#10b981"
                       >
@@ -959,7 +986,7 @@ export default function ForexTracker() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">No Trading Data Yet</h3>
                 <p className="text-gray-500 mb-4">
-                  {settings.length === 0 
+                  {settings.length === 0
                     ? "First set up your goals in the Goals & Targets tab, then add your trading data here."
                     : "Start by adding your first trade or initial balance in the Trading tab."
                   }
@@ -995,7 +1022,7 @@ export default function ForexTracker() {
               <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 <select
                   value={newTrade.type}
-                  onChange={(e) => setNewTrade({...newTrade, type: e.target.value})}
+                  onChange={(e) => setNewTrade({ ...newTrade, type: e.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="trade">Trade</option>
@@ -1006,7 +1033,7 @@ export default function ForexTracker() {
                 <input
                   type="date"
                   value={newTrade.date}
-                  onChange={(e) => setNewTrade({...newTrade, date: e.target.value})}
+                  onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <input
@@ -1014,9 +1041,9 @@ export default function ForexTracker() {
                   step="0.01"
                   placeholder={
                     newTrade.type === 'trade' ? 'Final Balance' :
-                    newTrade.type === 'deposit' ? 'Deposit Amount' :
-                    newTrade.type === 'withdrawal' ? 'Withdrawal Amount' :
-                    'Starting Balance'
+                      newTrade.type === 'deposit' ? 'Deposit Amount' :
+                        newTrade.type === 'withdrawal' ? 'Withdrawal Amount' :
+                          'Starting Balance'
                   }
                   value={newTrade.type === 'deposit' || newTrade.type === 'withdrawal' ? newTrade.depositAmount : newTrade.balance}
                   onChange={(e) => handleTradeValueChange(e.target.value, 'balance')}
@@ -1041,7 +1068,7 @@ export default function ForexTracker() {
                   type="text"
                   placeholder="Milestone (optional)"
                   value={newTrade.milestone}
-                  onChange={(e) => setNewTrade({...newTrade, milestone: e.target.value})}
+                  onChange={(e) => setNewTrade({ ...newTrade, milestone: e.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button
@@ -1052,13 +1079,13 @@ export default function ForexTracker() {
                   Add Entry
                 </button>
               </div>
-              
+
               {tradeValidationError && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
                   <p className="text-red-600 text-sm font-medium">{tradeValidationError}</p>
                 </div>
               )}
-              
+
               {newTrade.type === 'trade' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
                   <p className="text-blue-700 text-sm">💡 Input Methods for Trades:</p>
@@ -1089,7 +1116,7 @@ export default function ForexTracker() {
               {tradingData.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <p>
-                    {settings.length === 0 
+                    {settings.length === 0
                       ? "Set up your goals first, then add your trading entries here."
                       : "No entries yet. Add your first entry above to get started."
                     }
@@ -1119,20 +1146,20 @@ export default function ForexTracker() {
                               <span className="text-sm">{getTypeLabel(trade.type)}</span>
                             </div>
                           </td>
-                          
+
                           <td className="py-3 px-4">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="date"
                                 value={editingTrade.date}
-                                onChange={(e) => setEditingTrade({...editingTrade, date: e.target.value})}
+                                onChange={(e) => setEditingTrade({ ...editingTrade, date: e.target.value })}
                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                               />
                             ) : (
                               formatDate(trade.date)
                             )}
                           </td>
-                          
+
                           <td className="py-3 px-4 font-semibold">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
@@ -1146,7 +1173,7 @@ export default function ForexTracker() {
                               formatCurrency(trade.balance)
                             )}
                           </td>
-                          
+
                           <td className={`py-3 px-4 font-semibold ${getPnLColorClass(trade)}`}>
                             {trade.type === 'trade' ? (
                               editingTrade && editingTrade.id === trade.id ? (
@@ -1164,26 +1191,26 @@ export default function ForexTracker() {
                               '-'
                             )}
                           </td>
-                          
+
                           <td className="py-3 px-4">{formatCurrency(trade.amountToTarget)}</td>
-                          
+
                           <td className={`py-3 px-4 font-semibold ${getDailyGainColorClass(trade)}`}>
                             {trade.type === 'trade' && trade.dailyGain !== null ? `${trade.dailyGain.toFixed(2)}%` : '-'}
                           </td>
-                          
+
                           <td className="py-3 px-4 text-sm text-gray-600">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="text"
                                 value={editingTrade.milestone}
-                                onChange={(e) => setEditingTrade({...editingTrade, milestone: e.target.value})}
+                                onChange={(e) => setEditingTrade({ ...editingTrade, milestone: e.target.value })}
                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
                               />
                             ) : (
                               trade.milestone || '-'
                             )}
                           </td>
-                          
+
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
                               {editingTrade && editingTrade.id === trade.id ? (
@@ -1240,7 +1267,7 @@ export default function ForexTracker() {
                     type="text"
                     placeholder="Goal Name (e.g., Step1)"
                     value={newGoal.level}
-                    onChange={(e) => setNewGoal({...newGoal, level: e.target.value})}
+                    onChange={(e) => setNewGoal({ ...newGoal, level: e.target.value })}
                     onFocus={handleGoalNameFocus}
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -1248,7 +1275,7 @@ export default function ForexTracker() {
                     type="number"
                     placeholder="Start Balance"
                     value={newGoal.startBalance}
-                    onChange={(e) => setNewGoal({...newGoal, startBalance: e.target.value})}
+                    onChange={(e) => setNewGoal({ ...newGoal, startBalance: e.target.value })}
                     onFocus={handleStartBalanceFocus}
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -1256,7 +1283,7 @@ export default function ForexTracker() {
                     type="number"
                     placeholder="Target Balance"
                     value={newGoal.targetBalance}
-                    onChange={(e) => setNewGoal({...newGoal, targetBalance: e.target.value})}
+                    onChange={(e) => setNewGoal({ ...newGoal, targetBalance: e.target.value })}
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <button
@@ -1267,13 +1294,13 @@ export default function ForexTracker() {
                     Add Goal
                   </button>
                 </div>
-                
+
                 {validationError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <p className="text-red-600 text-sm font-medium">{validationError}</p>
                   </div>
                 )}
-                
+
                 {settings.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-blue-700 text-sm">💡 Tip: Next goal should start where the previous goal ends.</p>
