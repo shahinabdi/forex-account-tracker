@@ -834,7 +834,28 @@ export default function ForexTracker() {
   const deposits = tradingData.filter(trade => trade.type === 'deposit');
   const withdrawals = tradingData.filter(trade => trade.type === 'withdrawal');
   
-  const balanceChartData = tradingData.map(trade => {
+  const balanceChartData = tradingData.map((trade, index) => {
+    // Get previous balance for context
+    let previousBalance = 0;
+    if (index > 0) {
+      const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const currentIndex = sortedData.findIndex(t => t.id === trade.id);
+      if (currentIndex > 0) {
+        previousBalance = sortedData[currentIndex - 1].balance;
+      }
+    } else {
+      const currentStep = settings.find(s => s.status === 'In Progress');
+      previousBalance = currentStep ? currentStep.startBalance : 0;
+    }
+
+    // Calculate the deposit/withdrawal amount
+    let transactionAmount = 0;
+    if (trade.type === 'deposit') {
+      transactionAmount = trade.balance - previousBalance;
+    } else if (trade.type === 'withdrawal') {
+      transactionAmount = previousBalance - trade.balance;
+    }
+
     const dataPoint: any = {
       date: formatDate(trade.date),
       balance: trade.balance,
@@ -842,7 +863,10 @@ export default function ForexTracker() {
       // Add markers for deposits and withdrawals
       isDeposit: trade.type === 'deposit',
       isWithdrawal: trade.type === 'withdrawal',
-      entryType: trade.type
+      entryType: trade.type,
+      previousBalance: previousBalance,
+      transactionAmount: transactionAmount,
+      tradeData: trade // Store full trade data for tooltip
     };
     
     // Add completed step reference lines
@@ -1044,6 +1068,10 @@ export default function ForexTracker() {
                             const isDeposit = dataPoint.isDeposit;
                             const isWithdrawal = dataPoint.isWithdrawal;
                             const entryType = dataPoint.entryType;
+                            const previousBalance = dataPoint.previousBalance;
+                            const transactionAmount = dataPoint.transactionAmount;
+                            const currentBalance = dataPoint.balance;
+                            const tradeData = dataPoint.tradeData;
                             
                             return (
                               <div
@@ -1051,49 +1079,94 @@ export default function ForexTracker() {
                                   backgroundColor: '#f9fafb',
                                   border: '1px solid #e5e7eb',
                                   borderRadius: '8px',
-                                  padding: '12px'
+                                  padding: '12px',
+                                  minWidth: '200px'
                                 }}
                               >
                                 <p style={{ color: '#374151', margin: 0, marginBottom: '8px', fontWeight: 'bold' }}>
                                   {label}
                                 </p>
                                 
-                                {payload.map((entry: any, index: number) => {
-                                  if (entry.dataKey === 'balance') {
-                                    return (
-                                      <div key={index}>
-                                        <p style={{ color: '#3b82f6', margin: 0, fontWeight: '600' }}>
-                                          Balance: {formatCurrency(Number(entry.value))}
-                                        </p>
-                                        {isDeposit && (
-                                          <p style={{ color: '#10b981', margin: 0, fontSize: '12px', marginTop: '4px' }}>
-                                            💰 Deposit made
-                                          </p>
-                                        )}
-                                        {isWithdrawal && (
-                                          <p style={{ color: '#ef4444', margin: 0, fontSize: '12px', marginTop: '4px' }}>
-                                            💸 Withdrawal made
-                                          </p>
-                                        )}
-                                        {entryType === 'starting' && (
-                                          <p style={{ color: '#8b5cf6', margin: 0, fontSize: '12px', marginTop: '4px' }}>
-                                            🎯 Starting balance
-                                          </p>
-                                        )}
-                                        {entryType === 'trade' && (
-                                          <p style={{ color: '#6b7280', margin: 0, fontSize: '12px', marginTop: '4px' }}>
-                                            📈 Trading activity
-                                          </p>
-                                        )}
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })}
+                                {/* Show different content based on entry type */}
+                                {isDeposit && (
+                                  <div>
+                                    <p style={{ color: '#10b981', margin: 0, fontWeight: '600', marginBottom: '4px' }}>
+                                      💰 Deposit Made
+                                    </p>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '12px' }}>
+                                      Previous Balance: {formatCurrency(previousBalance)}
+                                    </p>
+                                    <p style={{ color: '#10b981', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                      + Deposit Amount: {formatCurrency(transactionAmount)}
+                                    </p>
+                                    <p style={{ color: '#3b82f6', margin: 0, fontSize: '12px', fontWeight: '600', marginTop: '4px' }}>
+                                      = New Balance: {formatCurrency(currentBalance)}
+                                    </p>
+                                  </div>
+                                )}
+                                
+                                {isWithdrawal && (
+                                  <div>
+                                    <p style={{ color: '#ef4444', margin: 0, fontWeight: '600', marginBottom: '4px' }}>
+                                      💸 Withdrawal Made
+                                    </p>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '12px' }}>
+                                      Previous Balance: {formatCurrency(previousBalance)}
+                                    </p>
+                                    <p style={{ color: '#ef4444', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                      - Withdrawal Amount: {formatCurrency(transactionAmount)}
+                                    </p>
+                                    <p style={{ color: '#3b82f6', margin: 0, fontSize: '12px', fontWeight: '600', marginTop: '4px' }}>
+                                      = New Balance: {formatCurrency(currentBalance)}
+                                    </p>
+                                  </div>
+                                )}
+                                
+                                {entryType === 'starting' && (
+                                  <div>
+                                    <p style={{ color: '#8b5cf6', margin: 0, fontWeight: '600', marginBottom: '4px' }}>
+                                      🎯 Starting Balance
+                                    </p>
+                                    <p style={{ color: '#3b82f6', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                      Initial Balance: {formatCurrency(currentBalance)}
+                                    </p>
+                                  </div>
+                                )}
+                                
+                                {entryType === 'trade' && (
+                                  <div>
+                                    <p style={{ color: '#6b7280', margin: 0, fontWeight: '600', marginBottom: '4px' }}>
+                                      📈 Trading Activity
+                                    </p>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '12px' }}>
+                                      Previous Balance: {formatCurrency(previousBalance)}
+                                    </p>
+                                    {tradeData.pnl !== null && tradeData.pnl !== 0 && (
+                                      <p style={{ 
+                                        color: tradeData.pnl > 0 ? '#10b981' : '#ef4444', 
+                                        margin: 0, 
+                                        fontSize: '12px', 
+                                        fontWeight: '600' 
+                                      }}>
+                                        {tradeData.pnl > 0 ? '+' : ''} P&L: {formatCurrency(tradeData.pnl)}
+                                      </p>
+                                    )}
+                                    <p style={{ color: '#3b82f6', margin: 0, fontSize: '12px', fontWeight: '600', marginTop: '4px' }}>
+                                      = New Balance: {formatCurrency(currentBalance)}
+                                    </p>
+                                  </div>
+                                )}
+                                
+                                {/* Show milestone if present */}
+                                {tradeData.milestone && (
+                                  <p style={{ color: '#f59e0b', margin: 0, fontSize: '11px', marginTop: '6px' }}>
+                                    🏆 Milestone: {tradeData.milestone}
+                                  </p>
+                                )}
                                 
                                 {/* Show current target */}
                                 <p style={{ color: '#ef4444', margin: 0, fontSize: '11px', marginTop: '6px' }}>
-                                  🎯 Target: {formatCurrency(summary.currentTarget)}
+                                  🎯 Current Target: {formatCurrency(summary.currentTarget)}
                                 </p>
                               </div>
                             );
