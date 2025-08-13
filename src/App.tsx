@@ -1,10 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
 import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+// Type definitions
+interface Trade {
+  id: number;
+  date: string;
+  balance: number;
+  pnl: number | null;
+  amountToTarget: number;
+  dailyGain: number | null;
+  milestone: string;
+  milestoneValue: number | null;
+  type: 'trade' | 'deposit' | 'withdrawal' | 'starting';
+}
+
+interface Goal {
+  level: string;
+  startBalance: number;
+  targetBalance: number;
+  status: 'In Progress' | 'Completed' | 'Not Started';
+  progress: string;
+}
+
+interface Summary {
+  latestBalance: number;
+  targetStatus: string;
+  currentTarget: number;
+  startForTarget: number;
+  progressToTarget: number;
+}
+
 export default function ForexTracker() {
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<Summary>({
     latestBalance: 0,
     targetStatus: 'No Goals Set',
     currentTarget: 0,
@@ -12,8 +41,8 @@ export default function ForexTracker() {
     progressToTarget: 0
   });
 
-  const [settings, setSettings] = useState([]);
-  const [tradingData, setTradingData] = useState([]);
+  const [settings, setSettings] = useState<Goal[]>([]);
+  const [tradingData, setTradingData] = useState<Trade[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [newTrade, setNewTrade] = useState({
@@ -32,7 +61,14 @@ export default function ForexTracker() {
     targetBalance: ''
   });
 
-  const [editingTrade, setEditingTrade] = useState(null);
+  const [editingTrade, setEditingTrade] = useState<{
+    id: number;
+    date: string;
+    balance: string;
+    pnl: string;
+    milestone: string;
+    type: string;
+  } | null>(null);
   const [validationError, setValidationError] = useState('');
   const [tradeValidationError, setTradeValidationError] = useState('');
 
@@ -219,7 +255,7 @@ export default function ForexTracker() {
     }
   }, [settings, tradingData.length]);
 
-  const calculateCorrectDailyGain = (currentBalance, previousBalance, type) => {
+  const calculateCorrectDailyGain = (currentBalance: number, previousBalance: number, type: string) => {
     if (type === 'deposit' || type === 'withdrawal' || type === 'starting') {
       return 0;
     }
@@ -227,14 +263,71 @@ export default function ForexTracker() {
     return ((currentBalance - previousBalance) / previousBalance) * 100;
   };
 
-  const handleTradeValueChange = (value, field) => {
+  // Function to recalculate all balances in correct order
+  const recalculateBalances = (data: Trade[]) => {
+    const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    let runningBalance = 0;
+    
+    // Find the first starting balance or use the first goal's start balance
+    const firstEntry = sortedData[0];
+    if (firstEntry?.type === 'starting') {
+      runningBalance = firstEntry.balance;
+    } else {
+      const firstGoal = settings.find(s => s.status === 'In Progress') || settings[0];
+      runningBalance = firstGoal ? firstGoal.startBalance : 0;
+    }
+
+    return sortedData.map((trade, index) => {
+      let currentBalance = trade.balance;
+      let pnl = 0;
+      let dailyGain = 0;
+      
+      const prevBalance = index > 0 ? sortedData[index - 1].balance : runningBalance;
+
+      switch (trade.type) {
+        case 'starting':
+          currentBalance = trade.balance;
+          break;
+        case 'deposit':
+          currentBalance = prevBalance + (trade.balance - prevBalance);
+          break;
+        case 'withdrawal':
+          currentBalance = prevBalance - (prevBalance - trade.balance);
+          break;
+        case 'trade':
+          // For trades, if pnl is provided, use it; otherwise calculate from balance difference
+          if (trade.pnl !== null && trade.pnl !== 0) {
+            pnl = trade.pnl;
+            currentBalance = prevBalance + pnl;
+          } else {
+            pnl = currentBalance - prevBalance;
+          }
+          dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+          break;
+      }
+
+      const currentStep = settings.find(s => s.status === 'In Progress');
+      const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
+
+      return {
+        ...trade,
+        balance: currentBalance,
+        pnl: trade.type === 'trade' ? pnl : 0,
+        dailyGain: trade.type === 'trade' ? dailyGain : 0,
+        amountToTarget
+      };
+    });
+  };
+
+  const handleTradeValueChange = (value: string, field: string) => {
     if (newTrade.type === 'deposit' || newTrade.type === 'withdrawal') {
       // For deposits/withdrawals, the value represents the amount to add/subtract
       const amount = parseFloat(value) || 0;
       let currentBalance = 0;
 
       if (tradingData.length > 0) {
-        currentBalance = tradingData[tradingData.length - 1].balance;
+        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        currentBalance = sortedData[sortedData.length - 1].balance;
       } else {
         const currentStep = settings.find(s => s.status === 'In Progress');
         currentBalance = currentStep ? currentStep.startBalance : 0;
@@ -267,7 +360,8 @@ export default function ForexTracker() {
       let prevBalance = 0;
 
       if (tradingData.length > 0) {
-        prevBalance = tradingData[tradingData.length - 1].balance;
+        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        prevBalance = sortedData[sortedData.length - 1].balance;
       } else {
         const currentStep = settings.find(s => s.status === 'In Progress');
         prevBalance = currentStep ? currentStep.startBalance : summary.startForTarget;
@@ -339,14 +433,16 @@ export default function ForexTracker() {
       let prevBalance = 0;
 
       if (tradingData.length > 0) {
-        prevBalance = tradingData[tradingData.length - 1].balance;
+        // Sort by date to get the most recent entry
+        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        prevBalance = sortedData[sortedData.length - 1].balance;
       } else if (newTrade.type === 'starting') {
         prevBalance = 0;
       } else {
         prevBalance = summary.startForTarget;
       }
 
-      const currentBalance = parseFloat(newTrade.balance);
+      let currentBalance = parseFloat(newTrade.balance);
       let pnl = 0;
       let dailyGain = 0;
 
@@ -354,6 +450,24 @@ export default function ForexTracker() {
         case 'trade':
           pnl = parseFloat(newTrade.pnl) || (currentBalance - prevBalance);
           dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+          break;
+        case 'deposit':
+          // For deposits, the entered amount is added to previous balance
+          if (newTrade.depositAmount) {
+            const depositAmount = parseFloat(newTrade.depositAmount);
+            currentBalance = prevBalance + depositAmount;
+          }
+          pnl = 0;
+          dailyGain = 0;
+          break;
+        case 'withdrawal':
+          // For withdrawals, the entered amount is subtracted from previous balance
+          if (newTrade.depositAmount) {
+            const withdrawalAmount = parseFloat(newTrade.depositAmount);
+            currentBalance = prevBalance - withdrawalAmount;
+          }
+          pnl = 0;
+          dailyGain = 0;
           break;
         default:
           pnl = 0;
@@ -363,7 +477,7 @@ export default function ForexTracker() {
       const currentStep = settings.find(s => s.status === 'In Progress');
       const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
 
-      const trade = {
+      const trade: Trade = {
         id: Date.now(),
         date: newTrade.date,
         balance: currentBalance,
@@ -372,10 +486,14 @@ export default function ForexTracker() {
         dailyGain: dailyGain,
         milestone: newTrade.milestone,
         milestoneValue: null,
-        type: newTrade.type
+        type: newTrade.type as Trade['type']
       };
 
-      setTradingData([...tradingData, trade]);
+      // Add the new trade and recalculate all balances to ensure consistency
+      const newTradingData = [...tradingData, trade];
+      const recalculatedData = recalculateBalances(newTradingData);
+      setTradingData(recalculatedData);
+      
       setNewTrade({
         date: new Date().toISOString().split('T')[0],
         balance: '',
@@ -445,40 +563,32 @@ export default function ForexTracker() {
       const updatedTradingData = tradingData.map(trade => {
         if (trade.id === editingTrade.id) {
           const currentBalance = parseFloat(editingTrade.balance);
-          const tradeIndex = tradingData.findIndex(t => t.id === trade.id);
-          const prevBalance = tradeIndex > 0 ? tradingData[tradeIndex - 1].balance : summary.startForTarget;
-
+          
           let pnl = 0;
-          let dailyGain = 0;
 
           switch (editingTrade.type) {
             case 'trade':
-              pnl = parseFloat(editingTrade.pnl) || (currentBalance - prevBalance);
-              dailyGain = calculateCorrectDailyGain(currentBalance, prevBalance, 'trade');
+              pnl = parseFloat(editingTrade.pnl) || 0;
               break;
             default:
               pnl = 0;
-              dailyGain = 0;
           }
-
-          const currentStep = settings.find(s => s.status === 'In Progress');
-          const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
 
           return {
             ...trade,
             date: editingTrade.date,
             balance: currentBalance,
             pnl: pnl,
-            amountToTarget: amountToTarget,
-            dailyGain: dailyGain,
             milestone: editingTrade.milestone,
-            type: editingTrade.type
+            type: editingTrade.type as Trade['type']
           };
         }
         return trade;
       });
 
-      setTradingData(updatedTradingData);
+      // Recalculate all balances to ensure consistency
+      const recalculatedData = recalculateBalances(updatedTradingData);
+      setTradingData(recalculatedData);
       setEditingTrade(null);
     }
   };
@@ -540,11 +650,11 @@ export default function ForexTracker() {
 
   const addNewGoal = () => {
     if (validateNewGoal()) {
-      const goal = {
+      const goal: Goal = {
         level: newGoal.level,
         startBalance: parseFloat(newGoal.startBalance),
         targetBalance: parseFloat(newGoal.targetBalance),
-        status: settings.length === 0 ? 'In Progress' : 'Not Started',
+        status: (settings.length === 0 ? 'In Progress' : 'Not Started') as Goal['status'],
         progress: ''
       };
 
@@ -683,7 +793,7 @@ export default function ForexTracker() {
     event.target.value = '';
   };
 
-  const formatCurrency = (value) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -691,12 +801,12 @@ export default function ForexTracker() {
     }).format(value);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getTypeIcon = (type) => {
+  const getTypeIcon = (type: string) => {
     switch (type) {
       case 'deposit':
         return <PlusCircle size={16} className="text-green-600" />;
@@ -709,7 +819,7 @@ export default function ForexTracker() {
     }
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string) => {
     switch (type) {
       case 'deposit':
         return 'Deposit';
@@ -722,11 +832,23 @@ export default function ForexTracker() {
     }
   };
 
-  const balanceChartData = tradingData.map(trade => ({
-    date: formatDate(trade.date),
-    balance: trade.balance,
-    target: summary.currentTarget
-  }));
+  // Get completed step targets for reference lines
+  const completedSteps = settings.filter(s => s.status === 'Completed');
+  
+  const balanceChartData = tradingData.map(trade => {
+    const dataPoint: any = {
+      date: formatDate(trade.date),
+      balance: trade.balance,
+      target: summary.currentTarget
+    };
+    
+    // Add completed step reference lines
+    completedSteps.forEach((step) => {
+      dataPoint[`completed_${step.level}`] = step.targetBalance;
+    });
+    
+    return dataPoint;
+  });
 
   const pnlChartData = tradingData
     .filter(trade => trade.pnl !== null && trade.type === 'trade')
@@ -734,10 +856,10 @@ export default function ForexTracker() {
       date: formatDate(trade.date),
       pnl: trade.pnl,
       dailyGain: trade.dailyGain,
-      fill: trade.pnl >= 0 ? '#10b981' : '#ef4444' // Green for positive, Red for negative
+      fill: (trade.pnl ?? 0) >= 0 ? '#10b981' : '#ef4444' // Green for positive, Red for negative
     }));
 
-  const getStatusBadgeClass = (status) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'In Progress':
         return 'bg-blue-100 text-blue-800';
@@ -748,17 +870,17 @@ export default function ForexTracker() {
     }
   };
 
-  const getPnLColorClass = (trade) => {
+  const getPnLColorClass = (trade: Trade) => {
     if (trade.type !== 'trade') return 'text-gray-400';
-    if (trade.pnl > 0) return 'text-green-600';
-    if (trade.pnl < 0) return 'text-red-600';
+    if ((trade.pnl ?? 0) > 0) return 'text-green-600';
+    if ((trade.pnl ?? 0) < 0) return 'text-red-600';
     return '';
   };
 
-  const getDailyGainColorClass = (trade) => {
+  const getDailyGainColorClass = (trade: Trade) => {
     if (trade.type !== 'trade') return 'text-gray-400';
-    if (trade.dailyGain > 0) return 'text-green-600';
-    if (trade.dailyGain < 0) return 'text-red-600';
+    if ((trade.dailyGain ?? 0) > 0) return 'text-green-600';
+    if ((trade.dailyGain ?? 0) < 0) return 'text-red-600';
     return '';
   };
 
@@ -898,7 +1020,15 @@ export default function ForexTracker() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip
-                        formatter={(value, name) => [formatCurrency(value), name === 'balance' ? 'Balance' : 'Target']}
+                        formatter={(value: any, name: any) => {
+                          if (name === 'balance') return [formatCurrency(value), 'Current Balance'];
+                          if (name === 'target') return [formatCurrency(value), 'Current Target'];
+                          if (name.startsWith('completed_')) {
+                            const stepName = name.replace('completed_', '');
+                            return [formatCurrency(value), `✓ ${stepName} (Completed)`];
+                          }
+                          return [formatCurrency(value), name];
+                        }}
                         labelStyle={{ color: '#374151' }}
                         contentStyle={{
                           backgroundColor: '#f9fafb',
@@ -906,10 +1036,50 @@ export default function ForexTracker() {
                           borderRadius: '8px'
                         }}
                       />
-                      <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} />
-                      <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value: any) => {
+                          if (value === 'balance') return 'Current Balance';
+                          if (value === 'target') return 'Current Target';
+                          if (value.startsWith('completed_')) {
+                            const stepName = value.replace('completed_', '');
+                            return `✓ ${stepName} (Completed)`;
+                          }
+                          return value;
+                        }}
+                      />
+                      <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={3} name="balance" />
+                      <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} name="target" />
+                      
+                      {/* Reference lines for completed steps */}
+                      {completedSteps.map((step) => (
+                        <Line 
+                          key={`completed-${step.level}`}
+                          type="monotone" 
+                          dataKey={`completed_${step.level}`}
+                          stroke="#10b981" 
+                          strokeDasharray="3 3" 
+                          strokeWidth={1.5}
+                          strokeOpacity={0.6}
+                          name={`completed_${step.level}`}
+                        />
+                      ))}
                     </LineChart>
                   </ResponsiveContainer>
+                  
+                  {/* Legend explanation */}
+                  {completedSteps.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-700 font-medium mb-1">Completed Milestones:</p>
+                      <div className="text-xs text-green-600">
+                        {completedSteps.map(step => (
+                          <span key={step.level} className="inline-block mr-4">
+                            ✓ {step.level}: {formatCurrency(step.targetBalance)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6">
@@ -920,11 +1090,11 @@ export default function ForexTracker() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip
-                        formatter={(value, name) => {
+                        formatter={(value: any, name: any) => {
                           if (name === 'P&L') {
-                            return [formatCurrency(value), 'P&L'];
+                            return [formatCurrency(Number(value)), 'P&L'];
                           }
-                          return [formatCurrency(value), name];
+                          return [formatCurrency(Number(value)), name];
                         }}
                         labelStyle={{ color: '#374151' }}
                         contentStyle={{
@@ -969,7 +1139,7 @@ export default function ForexTracker() {
                         fill="#10b981"
                       >
                         {pnlChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
+                          <Cell key={`cell-${index}`} fill={(entry.pnl ?? 0) >= 0 ? '#10b981' : '#ef4444'} />
                         ))}
                       </Bar>
                     </BarChart>
