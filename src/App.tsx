@@ -255,6 +255,18 @@ export default function ForexTracker() {
     }
   }, [settings, tradingData.length]);
 
+  // Helper function to get the current balance including all entries
+  const getCurrentBalance = () => {
+    if (tradingData.length === 0) {
+      const currentStep = settings.find(s => s.status === 'In Progress');
+      return currentStep ? currentStep.startBalance : 0;
+    }
+    
+    // Sort all data by date and get the most recent balance
+    const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return sortedData[sortedData.length - 1].balance;
+  };
+
   const calculateCorrectDailyGain = (currentBalance: number, previousBalance: number, type: string) => {
     if (type === 'deposit' || type === 'withdrawal' || type === 'starting') {
       return 0;
@@ -323,15 +335,7 @@ export default function ForexTracker() {
     if (newTrade.type === 'deposit' || newTrade.type === 'withdrawal') {
       // For deposits/withdrawals, the value represents the amount to add/subtract
       const amount = parseFloat(value) || 0;
-      let currentBalance = 0;
-
-      if (tradingData.length > 0) {
-        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        currentBalance = sortedData[sortedData.length - 1].balance;
-      } else {
-        const currentStep = settings.find(s => s.status === 'In Progress');
-        currentBalance = currentStep ? currentStep.startBalance : 0;
-      }
+      const currentBalance = getCurrentBalance();
 
       let newBalance;
       if (newTrade.type === 'deposit') {
@@ -357,15 +361,7 @@ export default function ForexTracker() {
 
     if (newTrade.type === 'trade') {
       const numValue = parseFloat(value) || 0;
-      let prevBalance = 0;
-
-      if (tradingData.length > 0) {
-        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        prevBalance = sortedData[sortedData.length - 1].balance;
-      } else {
-        const currentStep = settings.find(s => s.status === 'In Progress');
-        prevBalance = currentStep ? currentStep.startBalance : summary.startForTarget;
-      }
+      const prevBalance = getCurrentBalance();
 
       if (field === 'balance') {
         const calculatedPnL = numValue - prevBalance;
@@ -433,9 +429,8 @@ export default function ForexTracker() {
       let prevBalance = 0;
 
       if (tradingData.length > 0) {
-        // Sort by date to get the most recent entry
-        const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        prevBalance = sortedData[sortedData.length - 1].balance;
+        // Use the getCurrentBalance helper to get the most recent balance
+        prevBalance = getCurrentBalance();
       } else if (newTrade.type === 'starting') {
         prevBalance = 0;
       } else {
@@ -1424,9 +1419,12 @@ export default function ForexTracker() {
                   <p className="text-green-700 text-sm">💰 {newTrade.type === 'deposit' ? 'Deposit' : 'Withdrawal'} Information:</p>
                   <div className="text-xs text-green-600 mt-1">
                     <p>• Enter the amount to {newTrade.type === 'deposit' ? 'add to' : 'subtract from'} your current balance</p>
-                    <p>• Final Balance: {formatCurrency(parseFloat(newTrade.balance) || 0)}</p>
-                    {tradingData.length > 0 && (
-                      <p>• Current Balance: {formatCurrency(tradingData[tradingData.length - 1].balance)}</p>
+                    <p>• Current Balance: {formatCurrency(getCurrentBalance())}</p>
+                    {newTrade.balance && (
+                      <p>• New Balance After {newTrade.type === 'deposit' ? 'Deposit' : 'Withdrawal'}: {formatCurrency(parseFloat(newTrade.balance) || 0)}</p>
+                    )}
+                    {newTrade.depositAmount && (
+                      <p>• {newTrade.type === 'deposit' ? 'Deposit' : 'Withdrawal'} Amount: {formatCurrency(parseFloat(newTrade.depositAmount) || 0)}</p>
                     )}
                   </div>
                 </div>
