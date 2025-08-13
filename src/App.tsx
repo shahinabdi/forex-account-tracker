@@ -337,6 +337,19 @@ export default function ForexTracker() {
       const amount = parseFloat(value) || 0;
       const currentBalance = getCurrentBalance();
 
+      // Validate withdrawal amount
+      if (newTrade.type === 'withdrawal' && amount > currentBalance) {
+        setTradeValidationError(`Withdrawal amount (${formatCurrency(amount)}) cannot exceed current balance (${formatCurrency(currentBalance)})`);
+        setNewTrade({
+          ...newTrade,
+          balance: '',
+          depositAmount: value
+        });
+        return;
+      } else {
+        setTradeValidationError(''); // Clear error if validation passes
+      }
+
       let newBalance;
       if (newTrade.type === 'deposit') {
         newBalance = currentBalance + amount;
@@ -834,15 +847,22 @@ export default function ForexTracker() {
   const deposits = tradingData.filter(trade => trade.type === 'deposit');
   const withdrawals = tradingData.filter(trade => trade.type === 'withdrawal');
   
-  const balanceChartData = tradingData.map((trade, index) => {
+  // Sort trading data by date and time to ensure proper order
+  const sortedTradingData = [...tradingData].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    if (dateA === dateB) {
+      // If same date, sort by ID to maintain consistent order
+      return a.id - b.id;
+    }
+    return dateA - dateB;
+  });
+
+  const balanceChartData = sortedTradingData.map((trade, index) => {
     // Get previous balance for context
     let previousBalance = 0;
     if (index > 0) {
-      const sortedData = [...tradingData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const currentIndex = sortedData.findIndex(t => t.id === trade.id);
-      if (currentIndex > 0) {
-        previousBalance = sortedData[currentIndex - 1].balance;
-      }
+      previousBalance = sortedTradingData[index - 1].balance;
     } else {
       const currentStep = settings.find(s => s.status === 'In Progress');
       previousBalance = currentStep ? currentStep.startBalance : 0;
@@ -856,8 +876,16 @@ export default function ForexTracker() {
       transactionAmount = previousBalance - trade.balance;
     }
 
+    // Create unique identifier for each entry
+    const sameDayEntries = sortedTradingData.filter(t => t.date === trade.date);
+    const entryIndex = sameDayEntries.findIndex(t => t.id === trade.id);
+    const displayDate = sameDayEntries.length > 1 
+      ? `${formatDate(trade.date)} (${entryIndex + 1})`
+      : formatDate(trade.date);
+
     const dataPoint: any = {
-      date: formatDate(trade.date),
+      date: displayDate,
+      originalDate: trade.date,
       balance: trade.balance,
       target: summary.currentTarget,
       // Add markers for deposits and withdrawals
@@ -866,7 +894,10 @@ export default function ForexTracker() {
       entryType: trade.type,
       previousBalance: previousBalance,
       transactionAmount: transactionAmount,
-      tradeData: trade // Store full trade data for tooltip
+      tradeData: trade, // Store full trade data for tooltip
+      entryId: trade.id, // Unique ID for this entry
+      entryIndex: entryIndex + 1, // Position in same day entries
+      totalSameDayEntries: sameDayEntries.length
     };
     
     // Add completed step reference lines
@@ -1071,6 +1102,8 @@ export default function ForexTracker() {
                             const currentBalance = dataPoint.balance;
                             const transactionAmount = dataPoint.transactionAmount;
                             const tradeData = dataPoint.tradeData;
+                            const entryIndex = dataPoint.entryIndex;
+                            const totalSameDayEntries = dataPoint.totalSameDayEntries;
                             
                             return (
                               <div
@@ -1083,7 +1116,12 @@ export default function ForexTracker() {
                                 }}
                               >
                                 <p style={{ color: '#374151', margin: 0, marginBottom: '8px', fontWeight: 'bold' }}>
-                                  {label}
+                                  {formatDate(dataPoint.originalDate)}
+                                  {totalSameDayEntries > 1 && (
+                                    <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>
+                                      (Entry {entryIndex} of {totalSameDayEntries})
+                                    </span>
+                                  )}
                                 </p>
                                 
                                 {/* Current Balance */}
@@ -1114,6 +1152,11 @@ export default function ForexTracker() {
                                   <div>
                                     <p style={{ color: '#6b7280', margin: 0, fontSize: '12px', fontWeight: '600' }}>
                                       📈 Trade
+                                      {tradeData.pair && (
+                                        <span style={{ marginLeft: '4px', fontSize: '10px', color: '#9ca3af' }}>
+                                          ({tradeData.pair})
+                                        </span>
+                                      )}
                                     </p>
                                     {tradeData.pnl !== null && tradeData.pnl !== 0 && (
                                       <p style={{ 
@@ -1143,6 +1186,13 @@ export default function ForexTracker() {
                                 {tradeData.milestone && (
                                   <p style={{ color: '#f59e0b', margin: 0, fontSize: '11px', marginTop: '4px' }}>
                                     🏆 {tradeData.milestone}
+                                  </p>
+                                )}
+
+                                {/* Show notes if present */}
+                                {tradeData.notes && (
+                                  <p style={{ color: '#6b7280', margin: 0, fontSize: '10px', marginTop: '4px', fontStyle: 'italic' }}>
+                                    📝 {tradeData.notes}
                                   </p>
                                 )}
                               </div>
