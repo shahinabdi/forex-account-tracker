@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
-import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, LogOut, User } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Auth from './components/auth/Auth';
 
 // Type definitions
 interface Trade {
@@ -32,7 +34,46 @@ interface Summary {
   progressToTarget: number;
 }
 
-export default function ForexTracker() {
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+function AppContent() {
+  const { user, logout, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
+
+  return <ForexTracker user={user} onLogout={logout} />;
+}
+
+interface ForexTrackerProps {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    createdAt: string;
+  };
+  onLogout: () => void;
+}
+
+function ForexTracker({ user, onLogout }: ForexTrackerProps) {
   const [summary, setSummary] = useState<Summary>({
     latestBalance: 0,
     targetStatus: 'No Goals Set',
@@ -73,26 +114,26 @@ export default function ForexTracker() {
   const [tradeValidationError, setTradeValidationError] = useState('');
 
   useEffect(() => {
-    const savedSettings = localStorage.getItem('forexTracker_settings');
-    const savedTradingData = localStorage.getItem('forexTracker_tradingData');
-    const savedSummary = localStorage.getItem('forexTracker_summary');
+    const savedSettings = localStorage.getItem(`forexTracker_settings_${user.id}`);
+    const savedTradingData = localStorage.getItem(`forexTracker_tradingData_${user.id}`);
+    const savedSummary = localStorage.getItem(`forexTracker_summary_${user.id}`);
 
     if (savedSettings) setSettings(JSON.parse(savedSettings));
     if (savedTradingData) setTradingData(JSON.parse(savedTradingData));
     if (savedSummary) setSummary(JSON.parse(savedSummary));
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
-    localStorage.setItem('forexTracker_settings', JSON.stringify(settings));
-  }, [settings]);
+    localStorage.setItem(`forexTracker_settings_${user.id}`, JSON.stringify(settings));
+  }, [settings, user.id]);
 
   useEffect(() => {
-    localStorage.setItem('forexTracker_tradingData', JSON.stringify(tradingData));
-  }, [tradingData]);
+    localStorage.setItem(`forexTracker_tradingData_${user.id}`, JSON.stringify(tradingData));
+  }, [tradingData, user.id]);
 
   useEffect(() => {
-    localStorage.setItem('forexTracker_summary', JSON.stringify(summary));
-  }, [summary]);
+    localStorage.setItem(`forexTracker_summary_${user.id}`, JSON.stringify(summary));
+  }, [summary, user.id]);
 
   const checkAndAdvanceSteps = () => {
     if (tradingData.length > 0 && settings.length > 0) {
@@ -896,10 +937,6 @@ export default function ForexTracker() {
   // Get completed step targets for reference lines
   const completedSteps = settings.filter(s => s.status === 'Completed');
   
-  // Prepare deposits and withdrawals for markers
-  const deposits = tradingData.filter(trade => trade.type === 'deposit');
-  const withdrawals = tradingData.filter(trade => trade.type === 'withdrawal');
-  
   // Sort trading data by date and time to ensure proper order
   const sortedTradingData = [...tradingData].sort((a, b) => {
     const dateA = new Date(a.date).getTime();
@@ -1005,31 +1042,53 @@ export default function ForexTracker() {
               <h1 className="text-3xl font-bold text-gray-800">Forex Account Tracker</h1>
               <p className="text-gray-600 mt-1">Track your trading progress and milestones</p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={exportData}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Download size={16} />
-                Export
-              </button>
-              <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
-                <Upload size={16} />
-                Import
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={importData}
-                  className="hidden"
-                />
-              </label>
-              <button
-                onClick={checkAndAdvanceSteps}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Target size={16} />
-                Check Progress
-              </button>
+            <div className="flex items-center gap-4">
+              {/* User Info */}
+              <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <User className="text-white" size={16} />
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-800">{user.name}</p>
+                  <p className="text-gray-500">{user.email}</p>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={exportData}
+                  className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+                <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                  <Upload size={16} />
+                  Import
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={importData}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  onClick={checkAndAdvanceSteps}
+                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <Target size={16} />
+                  Check Progress
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
