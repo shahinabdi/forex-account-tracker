@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
 import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -186,11 +186,9 @@ export default function ForexTracker() {
         });
 
         if (hasChanged) {
-          const updatedTradingData = tradingData.map(trade => ({
-            ...trade,
-            amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
-          }));
-          setTradingData(updatedTradingData);
+          // Recalculate all balances to ensure consistency with correct amount to target for each trade
+          const recalculatedData = recalculateBalances(tradingData);
+          setTradingData(recalculatedData);
         }
       }
     } else {
@@ -226,17 +224,15 @@ export default function ForexTracker() {
     if (tradingData.length > 0 && settings.length > 0) {
       const currentStep = settings.find(s => s.status === 'In Progress');
       if (currentStep) {
-        const updatedTradingData = tradingData.map(trade => ({
-          ...trade,
-          amountToTarget: Math.max(currentStep.targetBalance - trade.balance, 0)
-        }));
+        // Recalculate all data to ensure correct amount to target for each trade
+        const recalculatedData = recalculateBalances(tradingData);
 
-        const hasChanges = updatedTradingData.some((trade, index) =>
+        const hasChanges = recalculatedData.some((trade, index) =>
           trade.amountToTarget !== tradingData[index].amountToTarget
         );
 
         if (hasChanges) {
-          setTradingData(updatedTradingData);
+          setTradingData(recalculatedData);
         }
 
         // Force summary update with latest data
@@ -273,6 +269,27 @@ export default function ForexTracker() {
     }
     if (previousBalance <= 0) return 0;
     return ((currentBalance - previousBalance) / previousBalance) * 100;
+  };
+
+  // Helper function to determine which step was active for a given balance and date
+  const getActiveStepForBalance = (balance: number): Goal | null => {
+    if (settings.length === 0) return null;
+    
+    // Sort settings by target balance to ensure proper order
+    const sortedSettings = [...settings].sort((a, b) => a.targetBalance - b.targetBalance);
+    
+    // Find the appropriate step based on balance
+    for (let i = 0; i < sortedSettings.length; i++) {
+      const step = sortedSettings[i];
+      
+      // If balance is below this step's target, this should be the active step
+      if (balance < step.targetBalance) {
+        return step;
+      }
+    }
+    
+    // If balance exceeds all targets, return the last step
+    return sortedSettings[sortedSettings.length - 1];
   };
 
   // Function to recalculate all balances in correct order
@@ -318,8 +335,9 @@ export default function ForexTracker() {
           break;
       }
 
-      const currentStep = settings.find(s => s.status === 'In Progress');
-      const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
+      // Calculate amount to target based on what step was active for this trade's balance
+      const activeStepForThisTrade = getActiveStepForBalance(currentBalance);
+      const amountToTarget = activeStepForThisTrade ? Math.max(activeStepForThisTrade.targetBalance - currentBalance, 0) : 0;
 
       return {
         ...trade,
@@ -329,6 +347,27 @@ export default function ForexTracker() {
         amountToTarget
       };
     });
+  };
+
+  // Helper function to suggest milestone text based on balance and current step
+  const getSuggestedMilestone = (balance: number): string => {
+    if (settings.length === 0) return '';
+    
+    const activeStep = getActiveStepForBalance(balance);
+    if (!activeStep) return '';
+    
+    // Check if balance reaches or exceeds the current step target
+    if (balance >= activeStep.targetBalance) {
+      return `🎯 Reached ${activeStep.level} target - ${formatCurrency(activeStep.targetBalance)}`;
+    }
+    
+    // Check if balance is close to target (within 10%)
+    const progressToTarget = (balance - activeStep.startBalance) / (activeStep.targetBalance - activeStep.startBalance);
+    if (progressToTarget >= 0.9) {
+      return `🔥 Almost at ${activeStep.level} target - ${((progressToTarget * 100).toFixed(1))}% complete`;
+    }
+    
+    return '';
   };
 
   const handleTradeValueChange = (value: string, field: string) => {
@@ -357,11 +396,14 @@ export default function ForexTracker() {
         newBalance = currentBalance - amount;
       }
 
+      const suggestedMilestone = getSuggestedMilestone(newBalance);
+
       setNewTrade({
         ...newTrade,
         balance: newBalance.toString(),
         pnl: '', // Deposits/withdrawals don't have P&L
-        depositAmount: value // Store the deposit/withdrawal amount
+        depositAmount: value, // Store the deposit/withdrawal amount
+        milestone: suggestedMilestone || newTrade.milestone
       });
       return;
     }
@@ -378,19 +420,23 @@ export default function ForexTracker() {
 
       if (field === 'balance') {
         const calculatedPnL = numValue - prevBalance;
+        const suggestedMilestone = getSuggestedMilestone(numValue);
         setNewTrade({
           ...newTrade,
           balance: value,
           pnl: calculatedPnL.toString(),
-          inputMode: 'balance'
+          inputMode: 'balance',
+          milestone: suggestedMilestone || newTrade.milestone
         });
       } else if (field === 'pnl') {
         const calculatedBalance = prevBalance + numValue;
+        const suggestedMilestone = getSuggestedMilestone(calculatedBalance);
         setNewTrade({
           ...newTrade,
           balance: calculatedBalance.toString(),
           pnl: value,
-          inputMode: 'pnl'
+          inputMode: 'pnl',
+          milestone: suggestedMilestone || newTrade.milestone
         });
       }
     }
@@ -399,8 +445,15 @@ export default function ForexTracker() {
   const validateTradeEntry = () => {
     const selectedDate = newTrade.date;
     const selectedType = newTrade.type;
+    const today = new Date().toISOString().split('T')[0];
 
     setTradeValidationError('');
+
+    // Check if date is in the future
+    if (selectedDate > today) {
+      setTradeValidationError('Cannot add entries for future dates. Please select today or an earlier date.');
+      return false;
+    }
 
     if (selectedType === 'trade' && !newTrade.balance && !newTrade.pnl) {
       setTradeValidationError('Either balance or P&L is required for trades');
@@ -482,8 +535,8 @@ export default function ForexTracker() {
           dailyGain = 0;
       }
 
-      const currentStep = settings.find(s => s.status === 'In Progress');
-      const amountToTarget = currentStep ? Math.max(currentStep.targetBalance - currentBalance, 0) : 0;
+      const activeStepForThisTrade = getActiveStepForBalance(currentBalance);
+      const amountToTarget = activeStepForThisTrade ? Math.max(activeStepForThisTrade.targetBalance - currentBalance, 0) : 0;
 
       const trade: Trade = {
         id: Date.now(),
@@ -1451,6 +1504,7 @@ export default function ForexTracker() {
                 <input
                   type="date"
                   value={newTrade.date}
+                  max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -1484,7 +1538,7 @@ export default function ForexTracker() {
                 )}
                 <input
                   type="text"
-                  placeholder="Milestone (optional)"
+                  placeholder="Milestone (optional) - e.g., 'Reached Step2 target'"
                   value={newTrade.milestone}
                   onChange={(e) => setNewTrade({ ...newTrade, milestone: e.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1526,6 +1580,35 @@ export default function ForexTracker() {
                     {newTrade.depositAmount && (
                       <p>• {newTrade.type === 'deposit' ? 'Deposit' : 'Withdrawal'} Amount: {formatCurrency(parseFloat(newTrade.depositAmount) || 0)}</p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Current Step Info */}
+              {settings.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-4">
+                  <p className="text-purple-700 text-sm">📊 Current Step Information:</p>
+                  <div className="text-xs text-purple-600 mt-1">
+                    {(() => {
+                      const currentStep = settings.find(s => s.status === 'In Progress');
+                      if (currentStep) {
+                        const currentBalance = getCurrentBalance();
+                        const progress = Math.max(0, (currentBalance - currentStep.startBalance) / (currentStep.targetBalance - currentStep.startBalance));
+                        const remaining = Math.max(0, currentStep.targetBalance - currentBalance);
+                        return (
+                          <>
+                            <p>• Active Step: <strong>{currentStep.level}</strong></p>
+                            <p>• Target: {formatCurrency(currentStep.targetBalance)} | Remaining: {formatCurrency(remaining)}</p>
+                            <p>• Progress: {(progress * 100).toFixed(1)}% complete</p>
+                            {newTrade.milestone && (
+                              <p>• Suggested Milestone: <em>"{newTrade.milestone}"</em></p>
+                            )}
+                          </>
+                        );
+                      } else {
+                        return <p>• No active step found</p>;
+                      }
+                    })()}
                   </div>
                 </div>
               )}
@@ -1573,6 +1656,7 @@ export default function ForexTracker() {
                               <input
                                 type="date"
                                 value={editingTrade.date}
+                                max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setEditingTrade({ ...editingTrade, date: e.target.value })}
                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                               />
