@@ -51,8 +51,24 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
     const worstDay = tradingData.length > 0 ? Math.min(...tradingData.map(t => t.pnl || 0)) : 0;
     const avgDaily = tradingData.length > 0 ? totalPnL / tradingData.length : 0;
     
-    const deposits = trades.filter(t => t.type === 'deposit').reduce((sum, t) => sum + parseFloat(t.depositAmount || '0'), 0);
-    const withdrawals = trades.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + parseFloat(t.depositAmount || '0'), 0);
+    // Calculate deposits and withdrawals from balance differences
+    const deposits = trades.filter(t => t.type === 'deposit').reduce((sum, t) => {
+      // For deposits, the amount is the difference between current and previous balance
+      const sortedTrades = trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const currentIndex = sortedTrades.findIndex(trade => trade.id === t.id);
+      const prevBalance = currentIndex > 0 ? sortedTrades[currentIndex - 1].balance : 0;
+      const depositAmount = t.balance - prevBalance;
+      return sum + Math.max(0, depositAmount);
+    }, 0);
+    
+    const withdrawals = trades.filter(t => t.type === 'withdrawal').reduce((sum, t) => {
+      // For withdrawals, the amount is the difference between previous and current balance
+      const sortedTrades = trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const currentIndex = sortedTrades.findIndex(trade => trade.id === t.id);
+      const prevBalance = currentIndex > 0 ? sortedTrades[currentIndex - 1].balance : 0;
+      const withdrawalAmount = prevBalance - t.balance;
+      return sum + Math.max(0, withdrawalAmount);
+    }, 0);
     const netDeposits = deposits - withdrawals;
     
     return {
@@ -93,13 +109,13 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
   const getRecentActivities = () => {
     return [...trades]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 10);
+      .slice(0, 5);
   };
 
   // Calculate current streak
   const getCurrentStreak = () => {
     const sortedTrades = trades
-      .filter(t => t.type === 'trade' && t.pnl !== null)
+      .filter(t => t.type === 'trade' && t.pnl !== null && t.pnl !== 0)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     if (sortedTrades.length === 0) return { type: 'none', count: 0 };
@@ -198,8 +214,8 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
                 <XAxis dataKey="month" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Bar dataKey="pnl">
+                <YAxis fontSize={12} tickFormatter={(value) => `$${value}`} />
+                <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                   {monthlyData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10B981' : '#EF4444'} />
                   ))}
@@ -287,40 +303,59 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
             <h3 className="font-semibold text-gray-900">Recent Activities</h3>
           </div>
           <div className="space-y-3 max-h-64 overflow-y-auto">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    activity.type === 'trade' ? 
-                      (activity.pnl || 0) >= 0 ? 'bg-green-500' : 'bg-red-500' :
-                    activity.type === 'deposit' ? 'bg-blue-500' :
-                    activity.type === 'withdrawal' ? 'bg-orange-500' :
-                    'bg-gray-500'
-                  }`} />
-                  <div>
-                    <span className="font-medium text-gray-900 capitalize">{activity.type}</span>
-                    <p className="text-sm text-gray-500">{activity.date}</p>
+            {recentActivities.map((activity) => {
+              // Calculate deposit/withdrawal amounts from balance differences
+              const sortedTrades = trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+              const currentIndex = sortedTrades.findIndex(t => t.id === activity.id);
+              const prevBalance = currentIndex > 0 ? sortedTrades[currentIndex - 1].balance : 0;
+              
+              let displayAmount = 0;
+              if (activity.type === 'deposit') {
+                displayAmount = Math.max(0, activity.balance - prevBalance);
+              } else if (activity.type === 'withdrawal') {
+                displayAmount = Math.max(0, prevBalance - activity.balance);
+              }
+
+              return (
+                <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${
+                      activity.type === 'trade' ? 
+                        (activity.pnl || 0) >= 0 ? 'bg-green-500' : 'bg-red-500' :
+                      activity.type === 'deposit' ? 'bg-blue-500' :
+                      activity.type === 'withdrawal' ? 'bg-orange-500' :
+                      'bg-gray-500'
+                    }`} />
+                    <div>
+                      <span className="font-medium text-gray-900 capitalize">{activity.type}</span>
+                      <p className="text-sm text-gray-500">{activity.date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {activity.type === 'trade' && activity.pnl !== null && (
+                      <span className={`font-semibold ${activity.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {activity.pnl >= 0 ? '+' : ''}{formatCurrency(activity.pnl)}
+                      </span>
+                    )}
+                    {activity.type === 'deposit' && (
+                      <span className="font-semibold text-green-600">
+                        +{formatCurrency(displayAmount)}
+                      </span>
+                    )}
+                    {activity.type === 'withdrawal' && (
+                      <span className="font-semibold text-red-600">
+                        -{formatCurrency(displayAmount)}
+                      </span>
+                    )}
+                    {activity.type === 'starting' && (
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(activity.balance)}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  {activity.type === 'trade' && activity.pnl !== null && (
-                    <span className={`font-semibold ${activity.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {activity.pnl >= 0 ? '+' : ''}{formatCurrency(activity.pnl)}
-                    </span>
-                  )}
-                  {(activity.type === 'deposit' || activity.type === 'withdrawal') && (
-                    <span className={`font-semibold ${activity.type === 'deposit' ? 'text-green-600' : 'text-red-600'}`}>
-                      {activity.type === 'deposit' ? '+' : '-'}{formatCurrency(parseFloat(activity.depositAmount || '0'))}
-                    </span>
-                  )}
-                  {activity.type === 'starting' && (
-                    <span className="font-semibold text-blue-600">
-                      {formatCurrency(activity.balance)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
