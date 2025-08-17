@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
-import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, Coffee, MessageCircle, Menu, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import SupportButtons from './components/SupportButtons';
 
 // Type definitions
 interface Trade {
@@ -44,6 +45,7 @@ export default function ForexTracker() {
   const [settings, setSettings] = useState<Goal[]>([]);
   const [tradingData, setTradingData] = useState<Trade[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [newTrade, setNewTrade] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -996,26 +998,28 @@ export default function ForexTracker() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Forex Account Tracker</h1>
-              <p className="text-gray-600 mt-1">Track your trading progress and milestones</p>
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Forex Account Tracker</h1>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Track your trading progress and milestones</p>
             </div>
-            <div className="flex gap-2">
+            
+            {/* Desktop Action Buttons */}
+            <div className="hidden sm:flex gap-2">
               <button
                 onClick={exportData}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
               >
                 <Download size={16} />
-                Export
+                <span className="hidden lg:inline">Export</span>
               </button>
-              <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+              <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm">
                 <Upload size={16} />
-                Import
+                <span className="hidden lg:inline">Import</span>
                 <input
                   type="file"
                   accept=".xlsx,.xls"
@@ -1025,23 +1029,112 @@ export default function ForexTracker() {
               </label>
               <button
                 onClick={checkAndAdvanceSteps}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm"
               >
                 <Target size={16} />
-                Check Progress
+                <span className="hidden lg:inline">Check Progress</span>
               </button>
             </div>
+
+            {/* Mobile Menu Button */}
+            <div className="sm:hidden">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors mobile-touch-target"
+              >
+                {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
+                Menu
+              </button>
+            </div>
+
+            {/* Mobile Action Buttons */}
+            {isMobileMenuOpen && (
+              <>
+                {/* Overlay */}
+                <div 
+                  className="fixed inset-0 z-40 sm:hidden" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                />
+                {/* Menu */}
+                <div className="sm:hidden bg-white border border-gray-200 rounded-lg p-3 absolute top-16 right-2 z-50 shadow-xl min-w-48 animate-slide-down">
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        exportData();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm mobile-touch-target"
+                    >
+                      <Download size={16} />
+                      Export Data
+                    </button>
+                    <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm mobile-touch-target">
+                      <Upload size={16} />
+                      Import Data
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => {
+                          importData(e);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        checkAndAdvanceSteps();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm mobile-touch-target"
+                    >
+                      <Target size={16} />
+                      Check Progress
+                    </button>
+                    <hr className="my-2 border-gray-300" />
+                    <button
+                      onClick={() => {
+                        window.open('https://buymeacoffee.com/shahinabdi', '_blank');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm coffee-button mobile-touch-target"
+                    >
+                      <Coffee size={16} />
+                      Buy Me a Coffee
+                    </button>
+                    <button
+                      onClick={() => {
+                        window.open('mailto:fxappfeedback@proton.me?subject=Forex Tracker Feedback', '_blank');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm feedback-button mobile-touch-target"
+                    >
+                      <MessageCircle size={16} />
+                      Send Feedback
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Desktop Feedback and Coffee Buttons */}
+          <div className="hidden sm:flex justify-center mt-4 pt-4 border-t border-gray-200">
+            <SupportButtons />
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="bg-white rounded-xl shadow-lg mb-6">
-          <div className="flex">
+        <div className="bg-white rounded-xl shadow-lg mb-4 sm:mb-6">
+          <div className="flex overflow-x-auto">
             {['dashboard', 'trading', 'goals'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-4 font-medium capitalize rounded-t-xl transition-colors ${activeTab === tab
+                onClick={() => {
+                  setActiveTab(tab);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`px-4 sm:px-6 py-3 sm:py-4 font-medium capitalize rounded-t-xl transition-colors flex-shrink-0 text-sm sm:text-base ${activeTab === tab
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 hover:text-blue-600'
                   }`}
@@ -1054,67 +1147,67 @@ export default function ForexTracker() {
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <DollarSign className="text-green-600" size={24} />
+                  <div className="p-2 sm:p-3 bg-green-100 rounded-full">
+                    <DollarSign className="text-green-600" size={20} />
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Balance</p>
-                    <p className="text-2xl font-bold text-gray-800">{formatCurrency(summary.latestBalance)}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600">Current Balance</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{formatCurrency(summary.latestBalance)}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <Target className="text-blue-600" size={24} />
+                  <div className="p-2 sm:p-3 bg-blue-100 rounded-full">
+                    <Target className="text-blue-600" size={20} />
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Target</p>
-                    <p className="text-2xl font-bold text-gray-800">{formatCurrency(summary.currentTarget)}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600">Current Target</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{formatCurrency(summary.currentTarget)}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <TrendingUp className="text-purple-600" size={24} />
+                  <div className="p-2 sm:p-3 bg-purple-100 rounded-full">
+                    <TrendingUp className="text-purple-600" size={20} />
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Progress</p>
-                    <p className="text-2xl font-bold text-gray-800">{(summary.progressToTarget * 100).toFixed(1)}%</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600">Progress</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-800">{(summary.progressToTarget * 100).toFixed(1)}%</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <Calendar className="text-orange-600" size={24} />
+                  <div className="p-2 sm:p-3 bg-orange-100 rounded-full">
+                    <Calendar className="text-orange-600" size={20} />
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Current Step</p>
-                    <p className="text-2xl font-bold text-gray-800">{summary.targetStatus}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600">Current Step</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-800 truncate">{summary.targetStatus}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Progress to Target</h3>
-              <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Progress to Target</h3>
+              <div className="w-full bg-gray-200 rounded-full h-3 sm:h-4 mb-2">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-green-500 h-4 rounded-full transition-all duration-500"
+                  className="bg-gradient-to-r from-blue-500 to-green-500 h-3 sm:h-4 rounded-full transition-all duration-500"
                   style={{ width: `${summary.progressToTarget * 100}%` }}
                 ></div>
               </div>
-              <div className="flex justify-between text-sm text-gray-600">
+              <div className="flex justify-between text-xs sm:text-sm text-gray-600">
                 <span>{formatCurrency(summary.startForTarget)}</span>
                 <span>{formatCurrency(summary.latestBalance)} / {formatCurrency(summary.currentTarget)}</span>
               </div>
@@ -1122,14 +1215,21 @@ export default function ForexTracker() {
 
             {/* Charts */}
             {tradingData.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Balance Over Time</h3>
-                  <ResponsiveContainer width="100%" height={300}>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+                <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4">Balance Over Time</h3>
+                  <ResponsiveContainer width="100%" height={250}>
                     <LineChart data={balanceChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
+                      <XAxis 
+                        dataKey="date" 
+                        fontSize={12}
+                        interval="preserveStartEnd"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value: any, name: any) => {
                           if (name === 'balance') return [formatCurrency(Number(value)), 'Current Balance'];
@@ -1144,7 +1244,8 @@ export default function ForexTracker() {
                         contentStyle={{
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
-                          borderRadius: '8px'
+                          borderRadius: '8px',
+                          fontSize: '12px'
                         }}
                         content={({ active, payload, label }) => {
                           if (active && payload && payload.length) {
@@ -1164,49 +1265,50 @@ export default function ForexTracker() {
                                   backgroundColor: '#f9fafb',
                                   border: '1px solid #e5e7eb',
                                   borderRadius: '8px',
-                                  padding: '12px',
-                                  minWidth: '180px'
+                                  padding: '8px',
+                                  minWidth: '160px',
+                                  fontSize: '11px'
                                 }}
                               >
-                                <p style={{ color: '#374151', margin: 0, marginBottom: '8px', fontWeight: 'bold' }}>
+                                <p style={{ color: '#374151', margin: 0, marginBottom: '6px', fontWeight: 'bold', fontSize: '12px' }}>
                                   {formatDate(dataPoint.originalDate)}
                                   {totalSameDayEntries > 1 && (
-                                    <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>
+                                    <span style={{ fontSize: '10px', color: '#6b7280', marginLeft: '4px' }}>
                                       (Entry {entryIndex} of {totalSameDayEntries})
                                     </span>
                                   )}
                                 </p>
                                 
                                 {/* Current Balance */}
-                                <p style={{ color: '#3b82f6', margin: 0, fontWeight: '600', marginBottom: '6px' }}>
+                                <p style={{ color: '#3b82f6', margin: 0, fontWeight: '600', marginBottom: '4px' }}>
                                   Balance: {formatCurrency(currentBalance)}
                                 </p>
                                 
                                 {/* Entry Type Specific Information */}
                                 {isDeposit && (
-                                  <p style={{ color: '#10b981', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                  <p style={{ color: '#10b981', margin: 0, fontSize: '10px', fontWeight: '600' }}>
                                     💰 Deposit: +{formatCurrency(transactionAmount)}
                                   </p>
                                 )}
                                 
                                 {isWithdrawal && (
-                                  <p style={{ color: '#ef4444', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                  <p style={{ color: '#ef4444', margin: 0, fontSize: '10px', fontWeight: '600' }}>
                                     💸 Withdrawal: -{formatCurrency(transactionAmount)}
                                   </p>
                                 )}
                                 
                                 {entryType === 'starting' && (
-                                  <p style={{ color: '#8b5cf6', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                  <p style={{ color: '#8b5cf6', margin: 0, fontSize: '10px', fontWeight: '600' }}>
                                     🎯 Starting Balance
                                   </p>
                                 )}
                                 
                                 {entryType === 'trade' && (
                                   <div>
-                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '12px', fontWeight: '600' }}>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: '10px', fontWeight: '600' }}>
                                       📈 Trade
                                       {tradeData.pair && (
-                                        <span style={{ marginLeft: '4px', fontSize: '10px', color: '#9ca3af' }}>
+                                        <span style={{ marginLeft: '4px', fontSize: '9px', color: '#9ca3af' }}>
                                           ({tradeData.pair})
                                         </span>
                                       )}
@@ -1215,7 +1317,7 @@ export default function ForexTracker() {
                                       <p style={{ 
                                         color: tradeData.pnl > 0 ? '#10b981' : '#ef4444', 
                                         margin: 0, 
-                                        fontSize: '11px', 
+                                        fontSize: '10px', 
                                         fontWeight: '600',
                                         marginTop: '2px'
                                       }}>
@@ -1226,7 +1328,7 @@ export default function ForexTracker() {
                                       <p style={{ 
                                         color: tradeData.dailyGain > 0 ? '#10b981' : '#ef4444', 
                                         margin: 0, 
-                                        fontSize: '11px',
+                                        fontSize: '9px',
                                         marginTop: '1px'
                                       }}>
                                         Daily Gain: {tradeData.dailyGain > 0 ? '+' : ''}{tradeData.dailyGain.toFixed(2)}%
@@ -1237,14 +1339,14 @@ export default function ForexTracker() {
                                 
                                 {/* Show milestone if present */}
                                 {tradeData.milestone && (
-                                  <p style={{ color: '#f59e0b', margin: 0, fontSize: '11px', marginTop: '4px' }}>
+                                  <p style={{ color: '#f59e0b', margin: 0, fontSize: '9px', marginTop: '3px' }}>
                                     🏆 {tradeData.milestone}
                                   </p>
                                 )}
 
                                 {/* Show notes if present */}
                                 {tradeData.notes && (
-                                  <p style={{ color: '#6b7280', margin: 0, fontSize: '10px', marginTop: '4px', fontStyle: 'italic' }}>
+                                  <p style={{ color: '#6b7280', margin: 0, fontSize: '9px', marginTop: '3px', fontStyle: 'italic' }}>
                                     📝 {tradeData.notes}
                                   </p>
                                 )}
@@ -1255,7 +1357,7 @@ export default function ForexTracker() {
                         }}
                       />
                       <Legend 
-                        wrapperStyle={{ paddingTop: '20px' }}
+                        wrapperStyle={{ paddingTop: '15px', fontSize: '11px' }}
                         formatter={(value: any) => {
                           if (value === 'balance') return 'Current Balance';
                           if (value === 'target') return 'Current Target';
@@ -1270,7 +1372,7 @@ export default function ForexTracker() {
                         type="monotone" 
                         dataKey="balance" 
                         stroke="#3b82f6" 
-                        strokeWidth={3} 
+                        strokeWidth={2} 
                         name="balance"
                         dot={(props: any) => {
                           const { cx, cy, payload } = props;
@@ -1279,7 +1381,7 @@ export default function ForexTracker() {
                               <circle 
                                 cx={cx} 
                                 cy={cy} 
-                                r={6} 
+                                r={4} 
                                 fill="#10b981" 
                                 stroke="#ffffff" 
                                 strokeWidth={2}
@@ -1291,7 +1393,7 @@ export default function ForexTracker() {
                               <circle 
                                 cx={cx} 
                                 cy={cy} 
-                                r={6} 
+                                r={4} 
                                 fill="#ef4444" 
                                 stroke="#ffffff" 
                                 strokeWidth={2}
@@ -1303,7 +1405,7 @@ export default function ForexTracker() {
                               <circle 
                                 cx={cx} 
                                 cy={cy} 
-                                r={5} 
+                                r={4} 
                                 fill="#8b5cf6" 
                                 stroke="#ffffff" 
                                 strokeWidth={2}
@@ -1343,39 +1445,39 @@ export default function ForexTracker() {
                   </ResponsiveContainer>
                   
                   {/* Legend explanation */}
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                     {/* Completed milestones */}
                     {completedSteps.length > 0 && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-700 font-medium mb-1">Completed Milestones:</p>
-                        <div className="text-xs text-green-600">
+                      <div className="p-2 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-xs sm:text-sm text-green-700 font-medium mb-1">Completed Milestones:</p>
+                        <div className="text-xs text-green-600 space-y-1">
                           {completedSteps.map(step => (
-                            <span key={step.level} className="inline-block mr-4">
+                            <div key={step.level} className="truncate">
                               ✓ {step.level}: {formatCurrency(step.targetBalance)}
-                            </span>
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
                     
                     {/* Chart markers legend */}
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700 font-medium mb-2">Chart Markers:</p>
+                    <div className="p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs sm:text-sm text-blue-700 font-medium mb-2">Chart Markers:</p>
                       <div className="text-xs text-blue-600 space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500 flex-shrink-0"></div>
                           <span>💰 Deposits</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500 flex-shrink-0"></div>
                           <span>💸 Withdrawals</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-purple-500 flex-shrink-0"></div>
                           <span>🎯 Starting Balance</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
                           <span>📈 Trading Activity</span>
                         </div>
                       </div>
@@ -1383,13 +1485,20 @@ export default function ForexTracker() {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Trading Profit & Loss</h3>
-                  <ResponsiveContainer width="100%" height={300}>
+                <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4">Trading Profit & Loss</h3>
+                  <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={pnlChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
+                      <XAxis 
+                        dataKey="date" 
+                        fontSize={12}
+                        interval="preserveStartEnd"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis fontSize={12} />
                       <Tooltip
                         formatter={(value: any, name: any) => {
                           if (name === 'P&L') {
@@ -1397,11 +1506,12 @@ export default function ForexTracker() {
                           }
                           return [formatCurrency(Number(value)), name];
                         }}
-                        labelStyle={{ color: '#374151' }}
+                        labelStyle={{ color: '#374151', fontSize: '12px' }}
                         contentStyle={{
                           backgroundColor: '#f9fafb',
                           border: '1px solid #e5e7eb',
-                          borderRadius: '8px'
+                          borderRadius: '8px',
+                          fontSize: '12px'
                         }}
                         // Fixed: Custom content with dynamic colors
                         content={({ active, payload, label }) => {
@@ -1416,7 +1526,8 @@ export default function ForexTracker() {
                                   backgroundColor: '#f9fafb',
                                   border: '1px solid #e5e7eb',
                                   borderRadius: '8px',
-                                  padding: '8px 12px'
+                                  padding: '8px',
+                                  fontSize: '12px'
                                 }}
                               >
                                 <p style={{ color: '#374151', margin: 0, marginBottom: '4px' }}>
@@ -1451,12 +1562,13 @@ export default function ForexTracker() {
 
             {/* No Data Message */}
             {tradingData.length === 0 && (
-              <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+              <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 text-center">
                 <div className="text-gray-400 mb-4">
-                  <TrendingUp size={48} className="mx-auto" />
+                  <TrendingUp size={36} className="mx-auto sm:block hidden" />
+                  <TrendingUp size={32} className="mx-auto sm:hidden" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-600 mb-2">No Trading Data Yet</h3>
-                <p className="text-gray-500 mb-4">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2">No Trading Data Yet</h3>
+                <p className="text-gray-500 mb-4 text-sm sm:text-base">
                   {settings.length === 0
                     ? "First set up your goals in the Goals & Targets tab, then add your trading data here."
                     : "Start by adding your first trade or initial balance in the Trading tab."
@@ -1464,7 +1576,7 @@ export default function ForexTracker() {
                 </p>
                 <button
                   onClick={() => setActiveTab(settings.length === 0 ? 'goals' : 'trading')}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
                   {settings.length === 0 ? "Set Up Goals First" : "Go to Trading Tab"}
                 </button>
@@ -1472,29 +1584,34 @@ export default function ForexTracker() {
             )}
 
             {/* Data Persistence Info */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
-              <h3 className="text-lg font-semibold mb-2 text-blue-800">💾 Data Storage Information</h3>
-              <p className="text-blue-700 mb-2">Your data is automatically saved in your browser local storage and persists between sessions.</p>
-              <div className="text-sm text-blue-600">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-2 text-blue-800">💾 Data Storage Information</h3>
+              <p className="text-blue-700 mb-2 text-sm sm:text-base">Your data is automatically saved in your browser local storage and persists between sessions.</p>
+              <div className="text-xs sm:text-sm text-blue-600 grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2">
                 <p>• Auto Save: All changes are saved instantly</p>
                 <p>• Export/Import: Use Excel files for backup</p>
                 <p>• Privacy: Data stays on your device</p>
                 <p>• Auto-Advancement: Steps advance automatically</p>
               </div>
             </div>
+
+            {/* Mobile Coffee and Feedback Buttons */}
+            <div className="sm:hidden bg-white rounded-xl shadow-lg p-4">
+              <SupportButtons isMobile={true} />
+            </div>
           </div>
         )}
 
         {/* Trading Tab */}
         {activeTab === 'trading' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Add New Entry</h3>
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Add New Entry</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
                 <select
                   value={newTrade.type}
                   onChange={(e) => setNewTrade({ ...newTrade, type: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
                   <option value="trade">Trade</option>
                   <option value="starting">Starting Balance</option>
@@ -1506,7 +1623,7 @@ export default function ForexTracker() {
                   value={newTrade.date}
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
                 <input
                   type="number"
@@ -1519,36 +1636,36 @@ export default function ForexTracker() {
                   }
                   value={newTrade.type === 'deposit' || newTrade.type === 'withdrawal' ? newTrade.depositAmount : newTrade.balance}
                   onChange={(e) => handleTradeValueChange(e.target.value, 'balance')}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
-                {newTrade.type === 'trade' && (
+                {newTrade.type === 'trade' ? (
                   <input
                     type="number"
                     step="0.01"
                     placeholder="OR P&L Amount"
                     value={newTrade.pnl}
                     onChange={(e) => handleTradeValueChange(e.target.value, 'pnl')}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
-                )}
-                {newTrade.type !== 'trade' && (
-                  <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-500">
+                ) : (
+                  <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-500 text-sm">
                     N/A
                   </div>
                 )}
                 <input
                   type="text"
-                  placeholder="Milestone (optional) - e.g., 'Reached Step2 target'"
+                  placeholder="Milestone (optional)"
                   value={newTrade.milestone}
                   onChange={(e) => setNewTrade({ ...newTrade, milestone: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:col-span-1"
                 />
                 <button
                   onClick={addNewTrade}
-                  className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:col-span-1 lg:col-span-1"
                 >
                   <Plus size={16} />
-                  Add Entry
+                  <span className="hidden sm:inline">Add Entry</span>
+                  <span className="sm:hidden">Add</span>
                 </button>
               </div>
 
@@ -1615,11 +1732,11 @@ export default function ForexTracker() {
             </div>
 
             {/* Trading History */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Trading History</h3>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Trading History</h3>
               {tradingData.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p>
+                  <p className="text-sm sm:text-base">
                     {settings.length === 0
                       ? "Set up your goals first, then add your trading entries here."
                       : "No entries yet. Add your first entry above to get started."
@@ -1628,58 +1745,60 @@ export default function ForexTracker() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[800px]">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4">Type</th>
-                        <th className="text-left py-3 px-4">Date</th>
-                        <th className="text-left py-3 px-4">Balance</th>
-                        <th className="text-left py-3 px-4">P&L</th>
-                        <th className="text-left py-3 px-4">Amount to Target</th>
-                        <th className="text-left py-3 px-4">Daily Gain %</th>
-                        <th className="text-left py-3 px-4">Milestone</th>
-                        <th className="text-left py-3 px-4">Actions</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Type</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Date</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Balance</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">P&L</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Amount to Target</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Daily Gain %</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Milestone</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tradingData.map((trade) => (
                         <tr key={trade.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
+                          <td className="py-3 px-2 sm:px-4">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               {getTypeIcon(trade.type)}
-                              <span className="text-sm">{getTypeLabel(trade.type)}</span>
+                              <span className="text-xs sm:text-sm hidden sm:inline">{getTypeLabel(trade.type)}</span>
+                              <span className="text-xs sm:hidden">{getTypeLabel(trade.type).slice(0,4)}</span>
                             </div>
                           </td>
 
-                          <td className="py-3 px-4">
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="date"
                                 value={editingTrade.date}
                                 max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => setEditingTrade({ ...editingTrade, date: e.target.value })}
-                                className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
+                                className="border border-gray-300 rounded px-2 py-1 text-xs w-full max-w-[120px]"
                               />
                             ) : (
                               formatDate(trade.date)
                             )}
                           </td>
 
-                          <td className="py-3 px-4 font-semibold">
+                          <td className="py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="number"
                                 step="0.01"
                                 value={editingTrade.balance}
                                 onChange={(e) => handleBalanceChange(e.target.value)}
-                                className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+                                className="border border-gray-300 rounded px-2 py-1 text-xs w-full max-w-[100px]"
                               />
                             ) : (
-                              formatCurrency(trade.balance)
+                              <span className="hidden sm:inline">{formatCurrency(trade.balance)}</span>
                             )}
+                            <span className="sm:hidden">${(trade.balance / 1000).toFixed(1)}k</span>
                           </td>
 
-                          <td className={`py-3 px-4 font-semibold ${getPnLColorClass(trade)}`}>
+                          <td className={`py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm ${getPnLColorClass(trade)}`}>
                             {trade.type === 'trade' ? (
                               editingTrade && editingTrade.id === trade.id ? (
                                 <input
@@ -1687,48 +1806,56 @@ export default function ForexTracker() {
                                   step="0.01"
                                   value={editingTrade.pnl}
                                   onChange={(e) => handlePnLChange(e.target.value)}
-                                  className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
+                                  className="border border-gray-300 rounded px-2 py-1 text-xs w-full max-w-[100px]"
                                 />
                               ) : (
-                                trade.pnl !== null ? formatCurrency(trade.pnl) : '-'
+                                <>
+                                  <span className="hidden sm:inline">{trade.pnl !== null ? formatCurrency(trade.pnl) : '-'}</span>
+                                  <span className="sm:hidden">{trade.pnl !== null ? `${trade.pnl > 0 ? '+' : ''}${(trade.pnl / 1000).toFixed(1)}k` : '-'}</span>
+                                </>
                               )
                             ) : (
                               '-'
                             )}
                           </td>
 
-                          <td className="py-3 px-4">{formatCurrency(trade.amountToTarget)}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">
+                            <span className="hidden sm:inline">{formatCurrency(trade.amountToTarget)}</span>
+                            <span className="sm:hidden">${(trade.amountToTarget / 1000).toFixed(1)}k</span>
+                          </td>
 
-                          <td className={`py-3 px-4 font-semibold ${getDailyGainColorClass(trade)}`}>
+                          <td className={`py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm ${getDailyGainColorClass(trade)}`}>
                             {trade.type === 'trade' && trade.dailyGain !== null ? `${trade.dailyGain.toFixed(2)}%` : '-'}
                           </td>
 
-                          <td className="py-3 px-4 text-sm text-gray-600">
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600 max-w-[100px] sm:max-w-none">
                             {editingTrade && editingTrade.id === trade.id ? (
                               <input
                                 type="text"
                                 value={editingTrade.milestone}
                                 onChange={(e) => setEditingTrade({ ...editingTrade, milestone: e.target.value })}
-                                className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
+                                className="border border-gray-300 rounded px-2 py-1 text-xs w-full"
                               />
                             ) : (
-                              trade.milestone || '-'
+                              <span className="truncate block" title={trade.milestone || '-'}>
+                                {trade.milestone || '-'}
+                              </span>
                             )}
                           </td>
 
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
+                          <td className="py-3 px-2 sm:px-4">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               {editingTrade && editingTrade.id === trade.id ? (
                                 <>
                                   <button
                                     onClick={saveEditedTrade}
-                                    className="text-green-600 hover:text-green-800 transition-colors"
+                                    className="text-green-600 hover:text-green-800 transition-colors text-sm"
                                   >
                                     ✓
                                   </button>
                                   <button
                                     onClick={cancelEditing}
-                                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                                    className="text-gray-600 hover:text-gray-800 transition-colors text-sm"
                                   >
                                     ✕
                                   </button>
@@ -1737,7 +1864,7 @@ export default function ForexTracker() {
                                 <>
                                   <button
                                     onClick={() => startEditingTrade(trade)}
-                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    className="text-blue-600 hover:text-blue-800 transition-colors text-sm"
                                   >
                                     ✏️
                                   </button>
@@ -1745,7 +1872,7 @@ export default function ForexTracker() {
                                     onClick={() => deleteTrade(trade.id)}
                                     className="text-red-600 hover:text-red-800 transition-colors"
                                   >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </>
                               )}
@@ -1763,18 +1890,18 @@ export default function ForexTracker() {
 
         {/* Goals Tab */}
         {activeTab === 'goals' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Add New Goal</h3>
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Add New Goal</h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   <input
                     type="text"
                     placeholder="Goal Name (e.g., Step1)"
                     value={newGoal.level}
                     onChange={(e) => setNewGoal({ ...newGoal, level: e.target.value })}
                     onFocus={handleGoalNameFocus}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                   <input
                     type="number"
@@ -1782,21 +1909,22 @@ export default function ForexTracker() {
                     value={newGoal.startBalance}
                     onChange={(e) => setNewGoal({ ...newGoal, startBalance: e.target.value })}
                     onFocus={handleStartBalanceFocus}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                   <input
                     type="number"
                     placeholder="Target Balance"
                     value={newGoal.targetBalance}
                     onChange={(e) => setNewGoal({ ...newGoal, targetBalance: e.target.value })}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                   <button
                     onClick={addNewGoal}
-                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
                   >
                     <Plus size={16} />
-                    Add Goal
+                    <span className="hidden sm:inline">Add Goal</span>
+                    <span className="sm:hidden">Add</span>
                   </button>
                 </div>
 
@@ -1815,51 +1943,63 @@ export default function ForexTracker() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Trading Goals & Targets</h3>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Trading Goals & Targets</h3>
               {settings.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Target size={48} className="mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium mb-2">No Goals Set Yet</p>
-                  <p>Add your first trading goal above to get started</p>
+                <div className="text-center py-6 sm:py-8 text-gray-500">
+                  <Target size={36} className="mx-auto mb-4 text-gray-400 sm:block hidden" />
+                  <Target size={32} className="mx-auto mb-4 text-gray-400 sm:hidden" />
+                  <p className="text-base sm:text-lg font-medium mb-2">No Goals Set Yet</p>
+                  <p className="text-sm sm:text-base">Add your first trading goal above to get started</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[700px]">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4">Goal</th>
-                        <th className="text-left py-3 px-4">Start Balance</th>
-                        <th className="text-left py-3 px-4">Target Balance</th>
-                        <th className="text-left py-3 px-4">Multiplier</th>
-                        <th className="text-left py-3 px-4">Profit Target</th>
-                        <th className="text-left py-3 px-4">Status</th>
-                        <th className="text-left py-3 px-4">Actions</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Goal</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Start Balance</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Target Balance</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Multiplier</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Profit Target</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Status</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {settings.map((setting, index) => (
                         <tr key={setting.level} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 font-semibold">{setting.level}</td>
-                          <td className="py-3 px-4">{formatCurrency(setting.startBalance)}</td>
-                          <td className="py-3 px-4">{formatCurrency(setting.targetBalance)}</td>
-                          <td className="py-3 px-4 font-semibold text-blue-600">
+                          <td className="py-3 px-2 sm:px-4 font-semibold text-xs sm:text-sm">{setting.level}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">
+                            <span className="hidden sm:inline">{formatCurrency(setting.startBalance)}</span>
+                            <span className="sm:hidden">${(setting.startBalance / 1000).toFixed(1)}k</span>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm">
+                            <span className="hidden sm:inline">{formatCurrency(setting.targetBalance)}</span>
+                            <span className="sm:hidden">${(setting.targetBalance / 1000).toFixed(1)}k</span>
+                          </td>
+                          <td className="py-3 px-2 sm:px-4 font-semibold text-blue-600 text-xs sm:text-sm">
                             {(setting.targetBalance / setting.startBalance).toFixed(1)}x
                           </td>
-                          <td className="py-3 px-4 font-semibold text-green-600">
-                            {formatCurrency(setting.targetBalance - setting.startBalance)}
+                          <td className="py-3 px-2 sm:px-4 font-semibold text-green-600 text-xs sm:text-sm">
+                            <span className="hidden sm:inline">{formatCurrency(setting.targetBalance - setting.startBalance)}</span>
+                            <span className="sm:hidden">+${((setting.targetBalance - setting.startBalance) / 1000).toFixed(1)}k</span>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3 px-2 sm:px-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(setting.status)}`}>
-                              {setting.status}
+                              <span className="hidden sm:inline">{setting.status}</span>
+                              <span className="sm:hidden">
+                                {setting.status === 'In Progress' ? 'Active' : 
+                                 setting.status === 'Completed' ? 'Done' : 'Wait'}
+                              </span>
                             </span>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3 px-2 sm:px-4">
                             <button
                               onClick={() => removeGoal(index)}
                               className="text-red-600 hover:text-red-800 transition-colors"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </td>
                         </tr>
