@@ -47,8 +47,8 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
   
@@ -134,7 +134,7 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
               {hasData && (
                 <div className="mt-1">
                   <div
-                    className={`text-xs px-2 py-1 rounded-full text-center font-medium ${
+                    className={`text-sm px-2 py-1 rounded-full text-center font-semibold ${
                       pnl >= 0
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
