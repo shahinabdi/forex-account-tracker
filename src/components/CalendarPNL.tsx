@@ -69,25 +69,25 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">P&L Calendar</h3>
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900">P&L Calendar</h3>
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={previousMonth}
-            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+            className="p-1.5 sm:p-1 hover:bg-gray-100 rounded-md transition-colors"
           >
-            <ChevronLeft size={20} className="text-gray-600" />
+            <ChevronLeft size={18} className="text-gray-600" />
           </button>
-          <span className="text-lg font-medium text-gray-900 min-w-[140px] text-center">
+          <span className="text-sm sm:text-lg font-medium text-gray-900 min-w-[120px] sm:min-w-[140px] text-center">
             {monthNames[month]} {year}
           </span>
           <button
             onClick={nextMonth}
-            className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+            className="p-1.5 sm:p-1 hover:bg-gray-100 rounded-md transition-colors"
           >
-            <ChevronRight size={20} className="text-gray-600" />
+            <ChevronRight size={18} className="text-gray-600" />
           </button>
         </div>
       </div>
@@ -98,9 +98,10 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
         {dayNames.map((day) => (
           <div
             key={day}
-            className="bg-gray-50 border-b border-gray-200 px-3 py-2 text-center text-sm font-medium text-gray-700"
+            className="bg-gray-50 border-b border-gray-200 px-1 sm:px-3 py-2 text-center text-xs sm:text-sm font-medium text-gray-700"
           >
-            {day}
+            <span className="sm:hidden">{day.slice(0, 1)}</span>
+            <span className="hidden sm:inline">{day}</span>
           </div>
         ))}
         
@@ -110,7 +111,7 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
             return (
               <div
                 key={index}
-                className="h-20 border-r border-b border-gray-200 bg-gray-25"
+                className="h-16 sm:h-20 border-r border-b border-gray-200 bg-gray-25"
               />
             );
           }
@@ -123,30 +124,36 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
           return (
             <div
               key={day}
-              className={`h-20 border-r border-b border-gray-200 p-2 relative hover:bg-gray-50 transition-colors ${
+              className={`h-16 sm:h-20 border-r border-b border-gray-200 p-1 sm:p-2 relative hover:bg-gray-50 transition-colors ${
                 isToday ? 'bg-blue-50' : 'bg-white'
               }`}
             >
-              <div className={`text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
+              <div className={`text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
                 {day}
               </div>
               
               {hasData && (
-                <div className="mt-1">
+                <div className="mt-0.5 sm:mt-1">
                   <div
-                    className={`text-sm px-2 py-1 rounded-full text-center font-semibold ${
+                    className={`text-xs sm:text-sm px-1 sm:px-2 py-0.5 sm:py-1 rounded-full text-center font-semibold leading-tight ${
                       pnl >= 0
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
                     }`}
+                    style={{ fontSize: 'clamp(8px, 2.5vw, 14px)' }}
                   >
-                    {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                    <span className="sm:hidden">
+                      {pnl >= 0 ? '+' : ''}{Math.abs(pnl) >= 1000 ? `${(pnl/1000).toFixed(0)}k` : `${pnl.toFixed(0)}`}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                    </span>
                   </div>
                 </div>
               )}
               
               {isToday && (
-                <div className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                <div className="absolute top-1 right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full" />
               )}
             </div>
           );
@@ -154,7 +161,7 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
       </div>
       
       {/* Monthly Summary */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="mt-4 sm:mt-6 grid grid-cols-3 gap-2 sm:gap-4">
         {(() => {
           const monthlyTrades = trades.filter(trade => {
             const tradeDate = new Date(trade.date);
@@ -167,23 +174,23 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
           
           return (
             <>
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-sm text-gray-600 mb-1">Monthly P&L</div>
-                <div className={`text-lg font-semibold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+                <div className="text-xs sm:text-sm text-gray-600 mb-1">Monthly P&L</div>
+                <div className={`text-sm sm:text-lg font-semibold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
                 </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-sm text-gray-600 mb-1">Profitable Days</div>
-                <div className="text-lg font-semibold text-green-600">
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+                <div className="text-xs sm:text-sm text-gray-600 mb-1">Win Days</div>
+                <div className="text-sm sm:text-lg font-semibold text-green-600">
                   {profitableDays}
                 </div>
               </div>
               
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-sm text-gray-600 mb-1">Losing Days</div>
-                <div className="text-lg font-semibold text-red-600">
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 text-center">
+                <div className="text-xs sm:text-sm text-gray-600 mb-1">Loss Days</div>
+                <div className="text-sm sm:text-lg font-semibold text-red-600">
                   {losingDays}
                 </div>
               </div>
