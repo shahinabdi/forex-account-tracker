@@ -1674,7 +1674,7 @@ export default function ForexTracker() {
                 <select
                   value={newTrade.type}
                   onChange={(e) => setNewTrade({ ...newTrade, type: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white shadow-sm appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iNSIgdmlld0JveD0iMCAwIDEwIDUiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0wIDBoMTBMNSA1eiIgZmlsbD0iIzZCNzI4MCIvPgo8L3N2Zz4=')] bg-no-repeat bg-[position:right_12px_center]"
                 >
                   <option value="trade">Trade</option>
                   <option value="starting">Starting Balance</option>
@@ -1687,7 +1687,7 @@ export default function ForexTracker() {
                     value={newTrade.date}
                     max={getTodayDate()}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-full"
+                    className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full bg-white shadow-sm"
                   />
                 </div>
                 <input
@@ -1701,7 +1701,7 @@ export default function ForexTracker() {
                   }
                   value={newTrade.type === 'deposit' || newTrade.type === 'withdrawal' ? newTrade.depositAmount : newTrade.balance}
                   onChange={(e) => handleTradeValueChange(e.target.value, 'balance')}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white shadow-sm"
                 />
                 {newTrade.type === 'trade' ? (
                   <input
@@ -1710,10 +1710,10 @@ export default function ForexTracker() {
                     placeholder="OR P&L Amount"
                     value={newTrade.pnl}
                     onChange={(e) => handleTradeValueChange(e.target.value, 'pnl')}
-                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white shadow-sm"
                   />
                 ) : (
-                  <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-500 text-sm">
+                  <div className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-gray-500 text-sm shadow-sm">
                     N/A
                   </div>
                 )}
@@ -1722,11 +1722,11 @@ export default function ForexTracker() {
                   placeholder="Milestone (optional)"
                   value={newTrade.milestone}
                   onChange={(e) => setNewTrade({ ...newTrade, milestone: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:col-span-1"
+                  className="border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm lg:col-span-1 bg-white shadow-sm"
                 />
                 <button
                   onClick={addNewTrade}
-                  className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:col-span-1 lg:col-span-1"
+                  className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-xl hover:bg-blue-700 transition-colors text-sm sm:col-span-1 lg:col-span-1 shadow-sm font-medium"
                 >
                   <Plus size={16} />
                   <span className="hidden sm:inline">Add Entry</span>
