@@ -51,14 +51,19 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
     const worstDay = tradingData.length > 0 ? Math.min(...tradingData.map(t => t.pnl || 0)) : 0;
     const avgDaily = tradingData.length > 0 ? totalPnL / tradingData.length : 0;
     
-    // Calculate deposits and withdrawals from balance differences
-    const deposits = trades.filter(t => t.type === 'deposit').reduce((sum, t) => {
-      // For deposits, the amount is the difference between current and previous balance
-      const sortedTrades = trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const currentIndex = sortedTrades.findIndex(trade => trade.id === t.id);
-      const prevBalance = currentIndex > 0 ? sortedTrades[currentIndex - 1].balance : 0;
-      const depositAmount = t.balance - prevBalance;
-      return sum + Math.max(0, depositAmount);
+    // Calculate deposits (including starting balances) and withdrawals from balance differences
+    const deposits = trades.filter(t => t.type === 'deposit' || t.type === 'starting').reduce((sum, t) => {
+      if (t.type === 'starting') {
+        // Starting balance is considered a deposit
+        return sum + t.balance;
+      } else {
+        // For deposits, the amount is the difference between current and previous balance
+        const sortedTrades = trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const currentIndex = sortedTrades.findIndex(trade => trade.id === t.id);
+        const prevBalance = currentIndex > 0 ? sortedTrades[currentIndex - 1].balance : 0;
+        const depositAmount = t.balance - prevBalance;
+        return sum + Math.max(0, depositAmount);
+      }
     }, 0);
     
     const withdrawals = trades.filter(t => t.type === 'withdrawal').reduce((sum, t) => {
@@ -112,30 +117,34 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
       .slice(0, 5);
   };
 
-  // Calculate current streak
+  // Calculate current streak - counts consecutive wins or losses from most recent trades
   const getCurrentStreak = () => {
-    const sortedTrades = trades
+    const tradingData = trades
       .filter(t => t.type === 'trade' && t.pnl !== null && t.pnl !== 0)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Most recent first
     
-    if (sortedTrades.length === 0) return { type: 'none', count: 0 };
+    if (tradingData.length === 0) return { type: 'none', count: 0 };
     
-    const firstTrade = sortedTrades[0];
-    const isWinning = (firstTrade.pnl || 0) > 0;
-    let streak = 1;
+    // Start with the most recent trade
+    const mostRecentTrade = tradingData[0];
+    const isWinningStreak = (mostRecentTrade.pnl || 0) > 0;
+    let streakCount = 0;
     
-    for (let i = 1; i < sortedTrades.length; i++) {
-      const trade = sortedTrades[i];
-      const tradeIsWinning = (trade.pnl || 0) > 0;
+    // Count consecutive trades of the same type (win/loss) from most recent backwards
+    for (const trade of tradingData) {
+      const isWin = (trade.pnl || 0) > 0;
       
-      if (tradeIsWinning === isWinning) {
-        streak++;
+      if (isWin === isWinningStreak) {
+        streakCount++;
       } else {
-        break;
+        break; // Stop when we hit a different type of trade
       }
     }
     
-    return { type: isWinning ? 'winning' : 'losing', count: streak };
+    return { 
+      type: isWinningStreak ? 'winning' : 'losing', 
+      count: streakCount 
+    };
   };
 
   const metrics = calculateMetrics();
@@ -210,12 +219,34 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
             </div>
             <h3 className="font-semibold text-gray-900">Monthly Performance</h3>
           </div>
-          <div className="h-48">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData}>
-                <XAxis dataKey="month" fontSize={12} />
-                <YAxis fontSize={12} tickFormatter={(value) => `$${value}`} />
-                <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+              <BarChart data={monthlyData} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
+                <XAxis 
+                  dataKey="month" 
+                  fontSize={12} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  fontSize={12} 
+                  tickFormatter={(value) => `$${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Bar 
+                  dataKey="pnl" 
+                  radius={[6, 6, 0, 0]}
+                  label={{
+                    position: 'top',
+                    fontSize: 11,
+                    fill: '#374151',
+                    formatter: (value: any) => {
+                      const num = Number(value);
+                      return num >= 0 ? `+$${Math.abs(num)}` : `-$${Math.abs(num)}`;
+                    }
+                  }}
+                >
                   {monthlyData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10B981' : '#EF4444'} />
                   ))}
@@ -314,6 +345,8 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
                 displayAmount = Math.max(0, activity.balance - prevBalance);
               } else if (activity.type === 'withdrawal') {
                 displayAmount = Math.max(0, prevBalance - activity.balance);
+              } else if (activity.type === 'starting') {
+                displayAmount = activity.balance; // Starting balance is the full amount
               }
 
               return (
@@ -324,10 +357,13 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
                         (activity.pnl || 0) >= 0 ? 'bg-green-500' : 'bg-red-500' :
                       activity.type === 'deposit' ? 'bg-blue-500' :
                       activity.type === 'withdrawal' ? 'bg-orange-500' :
+                      activity.type === 'starting' ? 'bg-purple-500' :
                       'bg-gray-500'
                     }`} />
                     <div>
-                      <span className="font-medium text-gray-900 capitalize">{activity.type}</span>
+                      <span className="font-medium text-gray-900 capitalize">
+                        {activity.type === 'starting' ? 'Starting Balance' : activity.type}
+                      </span>
                       <p className="text-sm text-gray-500">{activity.date}</p>
                     </div>
                   </div>
@@ -337,7 +373,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
                         {activity.pnl >= 0 ? '+' : ''}{formatCurrency(activity.pnl)}
                       </span>
                     )}
-                    {activity.type === 'deposit' && (
+                    {(activity.type === 'deposit' || activity.type === 'starting') && (
                       <span className="font-semibold text-green-600">
                         +{formatCurrency(displayAmount)}
                       </span>
@@ -345,11 +381,6 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
                     {activity.type === 'withdrawal' && (
                       <span className="font-semibold text-red-600">
                         -{formatCurrency(displayAmount)}
-                      </span>
-                    )}
-                    {activity.type === 'starting' && (
-                      <span className="font-semibold text-blue-600">
-                        {formatCurrency(activity.balance)}
                       </span>
                     )}
                   </div>
