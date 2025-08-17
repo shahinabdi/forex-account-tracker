@@ -213,46 +213,101 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Monthly Performance Chart */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-6">
             <div className="p-2 bg-indigo-100 rounded-lg">
               <Calendar size={20} className="text-indigo-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Monthly Performance</h3>
+            <div>
+              <h3 className="font-semibold text-gray-900">Monthly Performance</h3>
+              <p className="text-sm text-gray-500">Last 6 months P&L</p>
+            </div>
           </div>
-          <div className="h-64">
+          <div className="h-72 bg-gray-50 rounded-lg p-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData} margin={{ top: 30, right: 30, left: 20, bottom: 5 }}>
+              <BarChart 
+                data={monthlyData} 
+                margin={{ top: 40, right: 30, left: 20, bottom: 20 }}
+                barCategoryGap="20%"
+              >
                 <XAxis 
                   dataKey="month" 
                   fontSize={12} 
                   axisLine={false}
                   tickLine={false}
+                  tick={{ fill: '#6B7280' }}
                 />
                 <YAxis 
                   fontSize={12} 
-                  tickFormatter={(value) => `$${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
+                  tickFormatter={(value) => {
+                    if (Math.abs(value) >= 1000) {
+                      return `$${(value/1000).toFixed(1)}k`;
+                    }
+                    return `$${value.toFixed(2)}`;
+                  }}
                   axisLine={false}
                   tickLine={false}
+                  width={60}
+                  tick={{ fill: '#6B7280' }}
                 />
+                <defs>
+                  <linearGradient id="positiveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#10B981" stopOpacity={0.6}/>
+                  </linearGradient>
+                  <linearGradient id="negativeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#EF4444" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#EF4444" stopOpacity={0.6}/>
+                  </linearGradient>
+                </defs>
                 <Bar 
                   dataKey="pnl" 
-                  radius={[6, 6, 0, 0]}
+                  radius={[8, 8, 0, 0]}
+                  stroke="#E5E7EB"
+                  strokeWidth={1}
                   label={{
                     position: 'top',
                     fontSize: 11,
+                    fontWeight: 600,
                     fill: '#374151',
                     formatter: (value: any) => {
                       const num = Number(value);
-                      return num >= 0 ? `+$${Math.abs(num)}` : `-$${Math.abs(num)}`;
+                      if (Math.abs(num) >= 1000) {
+                        return num >= 0 ? `+$${(Math.abs(num)/1000).toFixed(1)}k` : `-$${(Math.abs(num)/1000).toFixed(1)}k`;
+                      }
+                      return num >= 0 ? `+$${Math.abs(num).toFixed(2)}` : `-$${Math.abs(num).toFixed(2)}`;
                     }
                   }}
                 >
                   {monthlyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10B981' : '#EF4444'} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.pnl >= 0 ? 'url(#positiveGradient)' : 'url(#negativeGradient)'} 
+                    />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          {/* Monthly Summary */}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-xs text-green-600 font-medium">Profitable Months</p>
+              <p className="text-lg font-bold text-green-700">
+                {monthlyData.filter(m => m.pnl > 0).length}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+              <p className="text-xs text-red-600 font-medium">Loss Months</p>
+              <p className="text-lg font-bold text-red-700">
+                {monthlyData.filter(m => m.pnl < 0).length}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-600 font-medium">Best Month</p>
+              <p className="text-lg font-bold text-blue-700">
+                {monthlyData.length > 0 ? formatCurrency(Math.max(...monthlyData.map(m => m.pnl))) : '$0.00'}
+              </p>
+            </div>
           </div>
         </div>
 
