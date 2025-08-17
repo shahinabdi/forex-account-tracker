@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import CalendarPNL from './components/CalendarPNL';
+import SummaryPage from './components/SummaryPage';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
-import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, Coffee, MessageCircle, Menu, X } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, Coffee, MessageCircle, Menu, X, BarChart3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import SupportButtons from './components/SupportButtons';
 
@@ -36,6 +37,7 @@ interface Summary {
 
 export default function ForexTracker() {
   const [showCalendarPNL, setShowCalendarPNL] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState<Summary>({
     latestBalance: 0,
     targetStatus: 'No Goals Set',
@@ -1213,17 +1215,40 @@ export default function ForexTracker() {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-4 sm:space-y-6">
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               <button
-                className={`px-4 py-2 rounded-xl font-medium shadow-sm border ${showCalendarPNL ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border-blue-600'}`}
-                onClick={() => setShowCalendarPNL(!showCalendarPNL)}
+                className={`px-4 py-2 rounded-xl font-medium shadow-sm border flex items-center gap-2 ${
+                  showCalendarPNL && !showSummary ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-600 hover:bg-blue-50'
+                }`}
+                onClick={() => {
+                  setShowCalendarPNL(!showCalendarPNL);
+                  setShowSummary(false);
+                }}
               >
-                <Calendar size={18} className="inline mr-2" /> Calendar P&L
+                <Calendar size={18} /> Calendar P&L
+              </button>
+              
+              <button
+                className={`px-4 py-2 rounded-xl font-medium shadow-sm border flex items-center gap-2 ${
+                  showSummary ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-600 border-green-600 hover:bg-green-50'
+                }`}
+                onClick={() => {
+                  setShowSummary(!showSummary);
+                  setShowCalendarPNL(false);
+                }}
+              >
+                <BarChart3 size={18} /> Summary Analytics
               </button>
             </div>
             {showCalendarPNL && (
               <CalendarPNL trades={tradingData.filter(t => t.type === 'trade' && t.pnl !== null).map(t => ({ date: t.date, pnl: Number(t.pnl) }))} />
             )}
+            {showSummary && (
+              <SummaryPage trades={tradingData} goals={settings} />
+            )}
+            
+            {!showCalendarPNL && !showSummary && (
+              <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3">
@@ -1675,6 +1700,8 @@ export default function ForexTracker() {
             <div className="sm:hidden bg-white rounded-xl shadow-lg p-4">
               <SupportButtons isMobile={true} />
             </div>
+              </>
+            )}
           </div>
         )}
 
