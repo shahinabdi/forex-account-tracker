@@ -1040,10 +1040,21 @@ export default function ForexTracker() {
             <div className="sm:hidden">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors mobile-touch-target"
+                className={`relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 mobile-touch-target press-feedback ${
+                  isMobileMenuOpen 
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-105' 
+                    : 'bg-gradient-to-r from-white to-gray-50 text-gray-700 border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 hover:from-gray-50 hover:to-white'
+                }`}
               >
-                {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
-                Menu
+                <div className="flex items-center gap-2">
+                  <div className={`transition-all duration-300 ${isMobileMenuOpen ? 'rotate-180 scale-110' : 'hover:scale-110'}`}>
+                    {isMobileMenuOpen ? <X size={18} className="drop-shadow-sm" /> : <Menu size={18} />}
+                  </div>
+                  <span className="text-sm font-semibold tracking-wide">Menu</span>
+                </div>
+                {!isMobileMenuOpen && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full animate-pulse shadow-sm"></div>
+                )}
               </button>
             </div>
 
@@ -1052,25 +1063,30 @@ export default function ForexTracker() {
               <>
                 {/* Overlay */}
                 <div 
-                  className="fixed inset-0 z-40 sm:hidden" 
+                  className="fixed inset-0 bg-black bg-opacity-25 z-40 sm:hidden backdrop-blur-sm" 
                   onClick={() => setIsMobileMenuOpen(false)}
                 />
                 {/* Menu */}
-                <div className="sm:hidden bg-white border border-gray-200 rounded-lg p-3 absolute top-16 right-2 z-50 shadow-xl min-w-48 animate-slide-down">
-                  <div className="flex flex-col gap-2">
+                <div className="sm:hidden bg-white border border-gray-100 rounded-2xl p-4 absolute top-16 right-2 z-50 shadow-2xl min-w-52 animate-slide-down">
+                  <div className="flex flex-col gap-3">
+                    <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Actions</div>
                     <button
                       onClick={() => {
                         exportData();
                         setIsMobileMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm mobile-touch-target"
+                      className="flex items-center gap-3 bg-green-50 text-green-700 px-4 py-3 rounded-xl hover:bg-green-100 transition-all duration-200 text-sm mobile-touch-target group"
                     >
-                      <Download size={16} />
-                      Export Data
+                      <div className="p-1.5 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                        <Download size={16} />
+                      </div>
+                      <span className="font-medium">Export Data</span>
                     </button>
-                    <label className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer text-sm mobile-touch-target">
-                      <Upload size={16} />
-                      Import Data
+                    <label className="flex items-center gap-3 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl hover:bg-blue-100 transition-all duration-200 cursor-pointer text-sm mobile-touch-target group">
+                      <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                        <Upload size={16} />
+                      </div>
+                      <span className="font-medium">Import Data</span>
                       <input
                         type="file"
                         accept=".xlsx,.xls"
@@ -1086,31 +1102,46 @@ export default function ForexTracker() {
                         checkAndAdvanceSteps();
                         setIsMobileMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm mobile-touch-target"
+                      className="flex items-center gap-3 bg-purple-50 text-purple-700 px-4 py-3 rounded-xl hover:bg-purple-100 transition-all duration-200 text-sm mobile-touch-target group"
                     >
-                      <Target size={16} />
-                      Check Progress
+                      <div className="p-1.5 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                        <Target size={16} />
+                      </div>
+                      <span className="font-medium">Check Progress</span>
                     </button>
-                    <hr className="my-2 border-gray-300" />
+                    
+                    <hr className="my-2 border-gray-200" />
+                    <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Support</div>
+                    
                     <button
                       onClick={() => {
                         window.open('https://buymeacoffee.com/shahinabdi', '_blank');
                         setIsMobileMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors text-sm coffee-button mobile-touch-target"
+                      className="flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-orange-50 text-yellow-700 px-4 py-3 rounded-xl hover:from-yellow-100 hover:to-orange-100 transition-all duration-200 text-sm mobile-touch-target group"
                     >
-                      <Coffee size={16} />
-                      Buy Me a Coffee
+                      <div className="p-1.5 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
+                        <Coffee size={16} />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Buy Me a Coffee</span>
+                        <span className="text-xs text-yellow-600">Support the app ☕</span>
+                      </div>
                     </button>
                     <button
                       onClick={() => {
                         window.open('mailto:fxappfeedback@proton.me?subject=Forex Tracker Feedback', '_blank');
                         setIsMobileMenuOpen(false);
                       }}
-                      className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm feedback-button mobile-touch-target"
+                      className="flex items-center gap-3 bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 px-4 py-3 rounded-xl hover:from-indigo-100 hover:to-blue-100 transition-all duration-200 text-sm mobile-touch-target group"
                     >
-                      <MessageCircle size={16} />
-                      Send Feedback
+                      <div className="p-1.5 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                        <MessageCircle size={16} />
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Send Feedback</span>
+                        <span className="text-xs text-indigo-600">Share your thoughts 💭</span>
+                      </div>
                     </button>
                   </div>
                 </div>
