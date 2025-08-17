@@ -74,6 +74,41 @@ export default function ForexTracker() {
   const [validationError, setValidationError] = useState('');
   const [tradeValidationError, setTradeValidationError] = useState('');
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  // Helper function to validate and handle date changes
+  const handleDateChange = (selectedDate: string) => {
+    const today = getTodayDate();
+    if (selectedDate > today) {
+      setTradeValidationError('Cannot select future dates. Date reset to today.');
+      setNewTrade({ ...newTrade, date: today });
+      // Clear the error after 3 seconds
+      setTimeout(() => {
+        setTradeValidationError('');
+      }, 3000);
+    } else {
+      setNewTrade({ ...newTrade, date: selectedDate });
+      // Clear any existing validation error
+      if (tradeValidationError.includes('Cannot select future dates')) {
+        setTradeValidationError('');
+      }
+    }
+  };
+
+  // Helper function for editing trade date changes
+  const handleEditDateChange = (selectedDate: string, tradeId: number) => {
+    const today = getTodayDate();
+    if (selectedDate > today) {
+      // Don't allow future date selection during editing
+      return;
+    } else if (editingTrade && editingTrade.id === tradeId) {
+      setEditingTrade({ ...editingTrade, date: selectedDate });
+    }
+  };
+
   useEffect(() => {
     const savedSettings = localStorage.getItem('forexTracker_settings');
     const savedTradingData = localStorage.getItem('forexTracker_tradingData');
@@ -1649,13 +1684,33 @@ export default function ForexTracker() {
                   <option value="deposit">Deposit</option>
                   <option value="withdrawal">Withdrawal</option>
                 </select>
-                <input
-                  type="date"
-                  value={newTrade.date}
-                  max={new Date().toISOString().split('T')[0]}
-                  onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={newTrade.date}
+                    max={getTodayDate()}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    onBlur={(e) => {
+                      // Double-check on blur to ensure no future date is set
+                      if (e.target.value > getTodayDate()) {
+                        handleDateChange(getTodayDate());
+                      }
+                    }}
+                    className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-full"
+                    onKeyDown={(e) => {
+                      // Prevent manual typing of future dates
+                      if (e.key === 'Enter') {
+                        const input = e.target as HTMLInputElement;
+                        if (input.value > getTodayDate()) {
+                          handleDateChange(getTodayDate());
+                        }
+                      }
+                    }}
+                  />
+                  <div className="sm:hidden absolute -bottom-6 left-0 text-xs text-gray-500">
+                    Max: Today ({getTodayDate()})
+                  </div>
+                </div>
                 <input
                   type="number"
                   step="0.01"
@@ -1700,9 +1755,24 @@ export default function ForexTracker() {
                 </button>
               </div>
 
+              {/* Mobile Date Restriction Notice */}
+              <div className="sm:hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-blue-700 text-xs">📅 <strong>Date Policy:</strong> Only today and past dates are allowed for entries. Future dates will be automatically reset to today.</p>
+              </div>
+
               {tradeValidationError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
-                  <p className="text-red-600 text-sm font-medium">{tradeValidationError}</p>
+                <div className={`border rounded-lg p-3 mt-4 ${
+                  tradeValidationError.includes('Cannot select future dates') 
+                    ? 'bg-orange-50 border-orange-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    tradeValidationError.includes('Cannot select future dates') 
+                      ? 'text-orange-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {tradeValidationError}
+                  </p>
                 </div>
               )}
 
@@ -1805,9 +1875,27 @@ export default function ForexTracker() {
                               <input
                                 type="date"
                                 value={editingTrade.date}
-                                max={new Date().toISOString().split('T')[0]}
-                                onChange={(e) => setEditingTrade({ ...editingTrade, date: e.target.value })}
+                                max={getTodayDate()}
+                                onChange={(e) => handleEditDateChange(e.target.value, trade.id)}
+                                onBlur={(e) => {
+                                  // Double-check on blur to ensure no future date is set
+                                  if (e.target.value > getTodayDate()) {
+                                    if (editingTrade && editingTrade.id === trade.id) {
+                                      setEditingTrade({ ...editingTrade, date: getTodayDate() });
+                                    }
+                                  }
+                                }}
                                 className="border border-gray-300 rounded px-2 py-1 text-xs w-full max-w-[120px]"
+                                onKeyDown={(e) => {
+                                  // Prevent manual typing of future dates
+                                  if (e.key === 'Enter') {
+                                    const input = e.target as HTMLInputElement;
+                                    if (input.value > getTodayDate()) {
+                                      e.preventDefault();
+                                      input.value = editingTrade.date; // Reset to original date
+                                    }
+                                  }
+                                }}
                               />
                             ) : (
                               formatDate(trade.date)
