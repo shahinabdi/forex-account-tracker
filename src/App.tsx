@@ -931,6 +931,83 @@ export default function ForexTracker() {
     }
   };
 
+  // Sample data and clear data functions
+  const loadSampleData = () => {
+    const sampleGoals: Goal[] = [
+      { level: 'Step 1', startBalance: 1000, targetBalance: 1500, status: 'Completed', progress: '100%' },
+      { level: 'Step 2', startBalance: 1500, targetBalance: 2250, status: 'Completed', progress: '100%' },
+      { level: 'Step 3', startBalance: 2250, targetBalance: 3375, status: 'In Progress', progress: '75%' },
+      { level: 'Step 4', startBalance: 3375, targetBalance: 5063, status: 'Not Started', progress: '0%' },
+      { level: 'Step 5', startBalance: 5063, targetBalance: 7595, status: 'Not Started', progress: '0%' }
+    ];
+
+    const sampleTrades: Trade[] = [
+      { id: 1, date: '2025-08-01', balance: 1000, pnl: null, amountToTarget: 500, dailyGain: null, milestone: 'Starting Balance', milestoneValue: null, type: 'starting' },
+      { id: 2, date: '2025-08-02', balance: 1075, pnl: 75, amountToTarget: 425, dailyGain: 7.5, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 3, date: '2025-08-03', balance: 1120, pnl: 45, amountToTarget: 380, dailyGain: 4.19, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 4, date: '2025-08-05', balance: 1085, pnl: -35, amountToTarget: 415, dailyGain: -3.12, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 5, date: '2025-08-06', balance: 1165, pnl: 80, amountToTarget: 335, dailyGain: 7.37, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 6, date: '2025-08-08', balance: 1245, pnl: 80, amountToTarget: 255, dailyGain: 6.87, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 7, date: '2025-08-09', balance: 1290, pnl: 45, amountToTarget: 210, dailyGain: 3.61, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 8, date: '2025-08-12', balance: 1380, pnl: 90, amountToTarget: 120, dailyGain: 6.98, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 9, date: '2025-08-13', balance: 1425, pnl: 45, amountToTarget: 75, dailyGain: 3.26, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 10, date: '2025-08-14', balance: 1500, pnl: 75, amountToTarget: 0, dailyGain: 5.26, milestone: 'Step 1 Complete!', milestoneValue: 1500, type: 'trade' },
+      { id: 11, date: '2025-08-15', balance: 1580, pnl: 80, amountToTarget: 670, dailyGain: 5.33, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 12, date: '2025-08-16', balance: 1650, pnl: 70, amountToTarget: 600, dailyGain: 4.43, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 13, date: '2025-08-19', balance: 1590, pnl: -60, amountToTarget: 660, dailyGain: -3.64, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 14, date: '2025-08-20', balance: 1675, pnl: 85, amountToTarget: 575, dailyGain: 5.35, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 15, date: '2025-08-21', balance: 1750, pnl: 75, amountToTarget: 500, dailyGain: 4.48, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 16, date: '2025-08-22', balance: 1825, pnl: 75, amountToTarget: 425, dailyGain: 4.29, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 17, date: '2025-08-23', balance: 1895, pnl: 70, amountToTarget: 355, dailyGain: 3.84, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 18, date: '2025-08-26', balance: 1970, pnl: 75, amountToTarget: 280, dailyGain: 3.96, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 19, date: '2025-08-27', balance: 2055, pnl: 85, amountToTarget: 195, dailyGain: 4.31, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 20, date: '2025-08-28', balance: 2125, pnl: 70, amountToTarget: 125, dailyGain: 3.41, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 21, date: '2025-08-29', balance: 2200, pnl: 75, amountToTarget: 50, dailyGain: 3.53, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 22, date: '2025-08-30', balance: 2250, pnl: 50, amountToTarget: 0, dailyGain: 2.27, milestone: 'Step 2 Complete!', milestoneValue: 2250, type: 'trade' },
+      { id: 23, date: '2025-09-02', balance: 2320, pnl: 70, amountToTarget: 1055, dailyGain: 3.11, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 24, date: '2025-09-03', balance: 2280, pnl: -40, amountToTarget: 1095, dailyGain: -1.72, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 25, date: '2025-09-04', balance: 2370, pnl: 90, amountToTarget: 1005, dailyGain: 3.95, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 26, date: '2025-09-05', balance: 2450, pnl: 80, amountToTarget: 925, dailyGain: 3.38, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 27, date: '2025-09-06', balance: 2535, pnl: 85, amountToTarget: 840, dailyGain: 3.47, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 28, date: '2025-09-07', balance: 2615, pnl: 80, amountToTarget: 760, dailyGain: 3.16, milestone: '', milestoneValue: null, type: 'trade' },
+      { id: 29, date: '2025-09-08', balance: 2700, pnl: 85, amountToTarget: 675, dailyGain: 3.25, milestone: '', milestoneValue: null, type: 'trade' }
+    ];
+
+    setSettings(sampleGoals);
+    setTradingData(sampleTrades);
+    
+    // Update summary with sample data
+    const latestBalance = sampleTrades[sampleTrades.length - 1].balance;
+    const currentGoal = sampleGoals.find(g => g.status === 'In Progress');
+    if (currentGoal) {
+      setSummary({
+        latestBalance,
+        targetStatus: 'In Progress',
+        currentTarget: currentGoal.targetBalance,
+        startForTarget: currentGoal.startBalance,
+        progressToTarget: ((latestBalance - currentGoal.startBalance) / (currentGoal.targetBalance - currentGoal.startBalance)) * 100
+      });
+    }
+  };
+
+  const clearAllData = () => {
+    if (window.confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+      setSettings([]);
+      setTradingData([]);
+      setSummary({
+        latestBalance: 0,
+        targetStatus: 'No Goals Set',
+        currentTarget: 0,
+        startForTarget: 0,
+        progressToTarget: 0
+      });
+      // Clear localStorage as well
+      localStorage.removeItem('forexTracker_settings');
+      localStorage.removeItem('forexTracker_tradingData');
+      localStorage.removeItem('forexTracker_summary');
+    }
+  };
+
   // Get completed step targets for reference lines
   const completedSteps = settings.filter(s => s.status === 'Completed');
   
@@ -1239,6 +1316,32 @@ export default function ForexTracker() {
               >
                 <BarChart3 size={18} /> Summary Analytics
               </button>
+            </div>
+
+            {/* Sample Data and Clear Data Buttons */}
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-yellow-800 mb-1">🚀 Try the Demo</h3>
+                  <p className="text-xs text-yellow-700">Load sample trading data to explore all features, or clear everything to start fresh.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={loadSampleData}
+                    className="flex items-center gap-2 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-xs sm:text-sm font-medium shadow-sm"
+                  >
+                    <Plus size={16} />
+                    Load Sample Data
+                  </button>
+                  <button
+                    onClick={clearAllData}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm font-medium shadow-sm"
+                  >
+                    <Trash2 size={16} />
+                    Clear All Data
+                  </button>
+                </div>
+              </div>
             </div>
             {showCalendarPNL && (
               <CalendarPNL trades={tradingData.filter(t => t.type === 'trade' && t.pnl !== null).map(t => ({ date: t.date, pnl: Number(t.pnl) }))} />
