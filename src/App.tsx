@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import CalendarPNL from './components/CalendarPNL';
 import SummaryPage from './components/SummaryPage';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from 'recharts';
-import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, Coffee, MessageCircle, Menu, X, BarChart3 } from 'lucide-react';
+import { TrendingUp, Target, DollarSign, Calendar, Download, Upload, Plus, Trash2, PlusCircle, MinusCircle, Coffee, MessageCircle, Menu, X, BarChart3, Image, Camera, Eye, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import SupportButtons from './components/SupportButtons';
 
@@ -17,6 +17,7 @@ interface Trade {
   milestone: string;
   milestoneValue: number | null;
   type: 'trade' | 'deposit' | 'withdrawal' | 'starting';
+  screenshot?: string; // base64 encoded image
 }
 
 interface Goal {
@@ -75,6 +76,7 @@ export default function ForexTracker() {
     milestone: string;
     type: string;
   } | null>(null);
+  const [screenshotModal, setScreenshotModal] = useState<{ isOpen: boolean; imageUrl: string | null }>({ isOpen: false, imageUrl: null });
   const [validationError, setValidationError] = useState('');
   const [tradeValidationError, setTradeValidationError] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -910,6 +912,43 @@ export default function ForexTracker() {
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString();
+  };
+
+  // Screenshot handling functions
+  const handleScreenshotUpload = async (tradeId: number, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setTradeValidationError('Please upload an image file');
+      setTimeout(() => setTradeValidationError(''), 3000);
+      return;
+    }
+
+    // Check file size (max 2MB recommended for localStorage)
+    if (file.size > 2 * 1024 * 1024) {
+      setTradeValidationError('Image too large. Please use an image smaller than 2MB');
+      setTimeout(() => setTradeValidationError(''), 3000);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      const updatedTrades = tradingData.map(trade => 
+        trade.id === tradeId ? { ...trade, screenshot: base64 } : trade
+      );
+      setTradingData(updatedTrades);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeScreenshot = (tradeId: number) => {
+    const updatedTrades = tradingData.map(trade => 
+      trade.id === tradeId ? { ...trade, screenshot: undefined } : trade
+    );
+    setTradingData(updatedTrades);
+  };
+
+  const viewScreenshot = (imageUrl: string) => {
+    setScreenshotModal({ isOpen: true, imageUrl });
   };
 
   const getTypeIcon = (type: string) => {
@@ -2018,6 +2057,7 @@ export default function ForexTracker() {
                         <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Amount to Target</th>
                         <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Daily Gain %</th>
                         <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Milestone</th>
+                        <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Screenshot</th>
                         <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm">Actions</th>
                       </tr>
                     </thead>
@@ -2110,6 +2150,45 @@ export default function ForexTracker() {
                                 {trade.milestone || '-'}
                               </span>
                             )}
+                          </td>
+
+                          <td className="py-3 px-2 sm:px-4">
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              {trade.screenshot ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => viewScreenshot(trade.screenshot!)}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    title="View screenshot"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => removeScreenshot(trade.id)}
+                                    className="text-red-600 hover:text-red-800 transition-colors"
+                                    title="Remove screenshot"
+                                  >
+                                    <XCircle size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors" title="Add screenshot">
+                                  <Camera size={16} />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        handleScreenshotUpload(trade.id, file);
+                                        e.target.value = '';
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
                           </td>
 
                           <td className="py-3 px-2 sm:px-4">
@@ -2316,6 +2395,28 @@ export default function ForexTracker() {
           </div>
         )}
       </div>
+
+      {/* Screenshot Modal */}
+      {screenshotModal.isOpen && screenshotModal.imageUrl && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
+          onClick={() => setScreenshotModal({ isOpen: false, imageUrl: null })}
+        >
+          <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-lg p-4" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setScreenshotModal({ isOpen: false, imageUrl: null })}
+              className="absolute top-2 right-2 text-gray-600 hover:text-gray-900 bg-white rounded-full p-2 shadow-lg"
+            >
+              <X size={24} />
+            </button>
+            <img 
+              src={screenshotModal.imageUrl} 
+              alt="Trade Screenshot" 
+              className="max-w-full max-h-[85vh] object-contain rounded"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
