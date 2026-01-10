@@ -1698,10 +1698,11 @@ export default function ForexTracker() {
                         strokeWidth={2} 
                         name="balance"
                         dot={(props: any) => {
-                          const { cx, cy, payload } = props;
+                          const { cx, cy, payload, index } = props;
                           if (payload.isDeposit) {
                             return (
                               <circle 
+                                key={`deposit-${index}`}
                                 cx={cx} 
                                 cy={cy} 
                                 r={4} 
@@ -1714,6 +1715,7 @@ export default function ForexTracker() {
                           if (payload.isWithdrawal) {
                             return (
                               <circle 
+                                key={`withdrawal-${index}`}
                                 cx={cx} 
                                 cy={cy} 
                                 r={4} 
@@ -1726,6 +1728,7 @@ export default function ForexTracker() {
                           if (payload.entryType === 'starting') {
                             return (
                               <circle 
+                                key={`starting-${index}`}
                                 cx={cx} 
                                 cy={cy} 
                                 r={4} 
@@ -1738,6 +1741,7 @@ export default function ForexTracker() {
                           // Default dot for trades - smaller and less prominent
                           return (
                             <circle 
+                              key={`trade-${index}`}
                               cx={cx} 
                               cy={cy} 
                               r={3} 
