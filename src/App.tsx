@@ -77,6 +77,7 @@ export default function ForexTracker() {
   } | null>(null);
   const [validationError, setValidationError] = useState('');
   const [tradeValidationError, setTradeValidationError] = useState('');
+  const [currency, setCurrency] = useState('USD');
 
   // Helper function to get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -104,10 +105,12 @@ export default function ForexTracker() {
     const savedSettings = localStorage.getItem('forexTracker_settings');
     const savedTradingData = localStorage.getItem('forexTracker_tradingData');
     const savedSummary = localStorage.getItem('forexTracker_summary');
+    const savedCurrency = localStorage.getItem('forexTracker_currency');
 
     if (savedSettings) setSettings(JSON.parse(savedSettings));
     if (savedTradingData) setTradingData(JSON.parse(savedTradingData));
     if (savedSummary) setSummary(JSON.parse(savedSummary));
+    if (savedCurrency) setCurrency(savedCurrency);
   }, []);
 
   useEffect(() => {
@@ -121,6 +124,10 @@ export default function ForexTracker() {
   useEffect(() => {
     localStorage.setItem('forexTracker_summary', JSON.stringify(summary));
   }, [summary]);
+
+  useEffect(() => {
+    localStorage.setItem('forexTracker_currency', currency);
+  }, [currency]);
 
   // Monitor date changes and enforce restrictions
   useEffect(() => {
@@ -895,7 +902,7 @@ export default function ForexTracker() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2
     }).format(value);
   };
@@ -1344,10 +1351,13 @@ export default function ForexTracker() {
               </div>
             </div>
             {showCalendarPNL && (
-              <CalendarPNL trades={tradingData.filter(t => t.type === 'trade' && t.pnl !== null).map(t => ({ date: t.date, pnl: Number(t.pnl) }))} />
+              <CalendarPNL 
+                trades={tradingData.filter(t => t.type === 'trade' && t.pnl !== null).map(t => ({ date: t.date, pnl: Number(t.pnl) }))} 
+                currency={currency}
+              />
             )}
             {showSummary && (
-              <SummaryPage trades={tradingData} goals={settings} />
+              <SummaryPage trades={tradingData} goals={settings} currency={currency} />
             )}
             
             {!showCalendarPNL && !showSummary && (
@@ -2199,6 +2209,41 @@ export default function ForexTracker() {
                     <p className="text-blue-600 text-xs mt-1">Expected start balance: {formatCurrency(parseFloat(getNextStartBalance()) || 0)}</p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Currency Selector */}
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-4">Account Currency</h3>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">Select the currency of your trading account:</p>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-full sm:w-64"
+                >
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="NZD">NZD - New Zealand Dollar</option>
+                  <option value="CNY">CNY - Chinese Yuan</option>
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="SGD">SGD - Singapore Dollar</option>
+                  <option value="HKD">HKD - Hong Kong Dollar</option>
+                  <option value="SEK">SEK - Swedish Krona</option>
+                  <option value="NOK">NOK - Norwegian Krone</option>
+                  <option value="DKK">DKK - Danish Krone</option>
+                  <option value="ZAR">ZAR - South African Rand</option>
+                  <option value="MXN">MXN - Mexican Peso</option>
+                  <option value="BRL">BRL - Brazilian Real</option>
+                  <option value="TRY">TRY - Turkish Lira</option>
+                  <option value="RUB">RUB - Russian Ruble</option>
+                </select>
+                <p className="text-xs text-gray-500">💡 This will be used to display all balance and P&L values</p>
               </div>
             </div>
 

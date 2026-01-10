@@ -26,14 +26,15 @@ interface Goal {
 interface SummaryPageProps {
   trades: Trade[];
   goals: Goal[];
+  currency?: string;
 }
 
-const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals }) => {
+const SummaryPage: React.FC<SummaryPageProps> = ({ trades, goals, currency = 'USD' }) => {
   // Format currency
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);

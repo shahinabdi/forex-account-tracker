@@ -8,9 +8,10 @@ interface Trade {
 
 interface CalendarPNLProps {
   trades: Trade[];
+  currency?: string;
 }
 
-const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
+const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades, currency = 'USD' }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Map trades by date for quick lookup
@@ -46,7 +47,7 @@ const CalendarPNL: React.FC<CalendarPNLProps> = ({ trades }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
