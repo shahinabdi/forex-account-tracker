@@ -825,7 +825,7 @@ export default function ForexTracker() {
   const exportData = () => {
     const wb = XLSX.utils.book_new();
 
-    // Trading data with screenshot indicators
+    // Trading data with screenshot indicators (but NOT the actual screenshot data to avoid Excel cell size limits)
     const tradingWS = XLSX.utils.aoa_to_sheet([
       [''],
       ['', 'Latest Balance', summary.latestBalance],
@@ -836,12 +836,11 @@ export default function ForexTracker() {
       ['', 'Account Currency', currency],
       ['', 'Progress Bar', ''],
       [''],
-      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value', 'Has Screenshot', 'Screenshot Data'],
+      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value', 'Has Screenshot'],
       ...tradingData.map(trade => [
         trade.date, trade.balance, trade.pnl, trade.amountToTarget,
         trade.dailyGain, trade.type, trade.milestone, trade.milestoneValue,
-        trade.screenshot ? 'Yes' : 'No',
-        trade.screenshot || ''
+        trade.screenshot ? 'Yes' : 'No'
       ])
     ]);
 
@@ -879,7 +878,7 @@ export default function ForexTracker() {
     // Show notification about screenshots
     const screenshotCount = tradingData.filter(t => t.screenshot).length;
     if (screenshotCount > 0) {
-      alert(`Export completed!\n\n✓ Data exported to ${filename}\n✓ ${screenshotCount} screenshot(s) included in the file\n\nNote: Screenshots are embedded as base64 data in the 'Screenshot Data' column.`);
+      alert(`Export completed!\n\n✓ Data exported to ${filename}\n✓ ${screenshotCount} screenshot(s) detected\n\n📸 Note: Screenshots are NOT included in Excel due to size limits.\nUse the "Download Screenshots" button above to save all images separately.`);
     }
   };
 
@@ -913,18 +912,15 @@ export default function ForexTracker() {
             dailyGain: row['Daily Gain %'] || 0,
             milestone: row.Milestone || '',
             milestoneValue: row['Milestone Value'] || null,
-            type: row.Type || 'trade',
-            screenshot: row['Screenshot Data'] || undefined
+            type: row.Type || 'trade'
+            // Note: Screenshots are NOT imported from Excel (kept separate)
           }));
         setTradingData(processedData);
 
-        // Show notification about imported screenshots
-        const importedScreenshots = processedData.filter(t => t.screenshot).length;
-        if (importedScreenshots > 0) {
-          setTimeout(() => {
-            alert(`Import successful!\n\n✓ ${processedData.length} trade(s) imported\n✓ ${importedScreenshots} screenshot(s) restored`);
-          }, 500);
-        }
+        // Show import notification
+        setTimeout(() => {
+          alert(`Import successful!\n\n✓ ${processedData.length} trade(s) imported\n✓ Currency settings restored\n\n📸 Note: Screenshots are NOT included in Excel imports.\nYour existing screenshots in browser storage are preserved.`);
+        }, 500);
       }
 
       const settingsSheet = wb.Sheets['Settings'];
