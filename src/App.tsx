@@ -825,6 +825,7 @@ export default function ForexTracker() {
   const exportData = () => {
     const wb = XLSX.utils.book_new();
 
+    // Trading data with screenshot indicators
     const tradingWS = XLSX.utils.aoa_to_sheet([
       [''],
       ['', 'Latest Balance', summary.latestBalance],
@@ -832,12 +833,15 @@ export default function ForexTracker() {
       ['', 'Current Target', summary.currentTarget],
       ['', 'Start for this Target', summary.startForTarget],
       ['', 'Progress to Target', summary.progressToTarget],
+      ['', 'Account Currency', currency],
       ['', 'Progress Bar', ''],
       [''],
-      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value'],
+      ['Date', 'Balance', 'PNL', 'Amount to Target', 'Daily Gain %', 'Type', 'Milestone', 'Milestone Value', 'Has Screenshot', 'Screenshot Data'],
       ...tradingData.map(trade => [
         trade.date, trade.balance, trade.pnl, trade.amountToTarget,
-        trade.dailyGain, trade.type, trade.milestone, trade.milestoneValue
+        trade.dailyGain, trade.type, trade.milestone, trade.milestoneValue,
+        trade.screenshot ? 'Yes' : 'No',
+        trade.screenshot || ''
       ])
     ]);
 
@@ -851,14 +855,32 @@ export default function ForexTracker() {
       ProfitTarget: s.targetBalance - s.startBalance
     })));
 
+    // Configuration sheet
+    const configWS = XLSX.utils.aoa_to_sheet([
+      ['Configuration'],
+      [''],
+      ['Setting', 'Value'],
+      ['Account Currency', currency],
+      ['Export Date', new Date().toISOString()],
+      ['Total Trades', tradingData.length],
+      ['Trades with Screenshots', tradingData.filter(t => t.screenshot).length]
+    ]);
+
     XLSX.utils.book_append_sheet(wb, tradingWS, 'Trading Log');
     XLSX.utils.book_append_sheet(wb, settingsWS, 'Settings');
+    XLSX.utils.book_append_sheet(wb, configWS, 'Configuration');
 
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     const filename = 'Forex_Account_Tracker_' + dateStr + '.xlsx';
 
     XLSX.writeFile(wb, filename);
+
+    // Show notification about screenshots
+    const screenshotCount = tradingData.filter(t => t.screenshot).length;
+    if (screenshotCount > 0) {
+      alert(`Export completed!\n\n✓ Data exported to ${filename}\n✓ ${screenshotCount} screenshot(s) included in the file\n\nNote: Screenshots are embedded as base64 data in the 'Screenshot Data' column.`);
+    }
   };
 
   const importData = async (event) => {
@@ -867,9 +889,19 @@ export default function ForexTracker() {
       const data = await file.arrayBuffer();
       const wb = XLSX.read(data);
 
+      // Import configuration (including currency)
+      const configSheet = wb.Sheets['Configuration'];
+      if (configSheet) {
+        const configData = XLSX.utils.sheet_to_json(configSheet, { header: 1 });
+        const currencyRow = configData.find((row: any) => row[0] === 'Account Currency');
+        if (currencyRow && currencyRow[1]) {
+          setCurrency(currencyRow[1]);
+        }
+      }
+
       const tradingSheet = wb.Sheets['Trading Log'];
       if (tradingSheet) {
-        const importedData = XLSX.utils.sheet_to_json(tradingSheet, { range: 8 });
+        const importedData = XLSX.utils.sheet_to_json(tradingSheet, { range: 9 });
         const processedData = importedData
           .filter(row => row.Balance)
           .map((row, index) => ({
@@ -881,9 +913,18 @@ export default function ForexTracker() {
             dailyGain: row['Daily Gain %'] || 0,
             milestone: row.Milestone || '',
             milestoneValue: row['Milestone Value'] || null,
-            type: row.Type || 'trade'
+            type: row.Type || 'trade',
+            screenshot: row['Screenshot Data'] || undefined
           }));
         setTradingData(processedData);
+
+        // Show notification about imported screenshots
+        const importedScreenshots = processedData.filter(t => t.screenshot).length;
+        if (importedScreenshots > 0) {
+          setTimeout(() => {
+            alert(`Import successful!\n\n✓ ${processedData.length} trade(s) imported\n✓ ${importedScreenshots} screenshot(s) restored`);
+          }, 500);
+        }
       }
 
       const settingsSheet = wb.Sheets['Settings'];
@@ -949,6 +990,39 @@ export default function ForexTracker() {
 
   const viewScreenshot = (imageUrl: string) => {
     setScreenshotModal({ isOpen: true, imageUrl });
+  };
+
+  // Download all screenshots as separate files
+  const downloadAllScreenshots = () => {
+    const tradesWithScreenshots = tradingData.filter(t => t.screenshot);
+    
+    if (tradesWithScreenshots.length === 0) {
+      alert('No screenshots to download');
+      return;
+    }
+
+    tradesWithScreenshots.forEach((trade, index) => {
+      // Create a link element
+      const link = document.createElement('a');
+      link.href = trade.screenshot!;
+      
+      // Create filename with trade date and index
+      const dateStr = trade.date.replace(/-/g, '');
+      const filename = `trade_${dateStr}_${index + 1}.png`;
+      link.download = filename;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Add small delay between downloads to prevent browser blocking
+      if (index < tradesWithScreenshots.length - 1) {
+        setTimeout(() => {}, 100);
+      }
+    });
+
+    alert(`Downloaded ${tradesWithScreenshots.length} screenshot(s)`);
   };
 
   const getTypeIcon = (type: string) => {
@@ -2035,7 +2109,20 @@ export default function ForexTracker() {
 
             {/* Trading History */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold mb-4">Trading History</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-semibold">Trading History</h3>
+                {tradingData.filter(t => t.screenshot).length > 0 && (
+                  <button
+                    onClick={downloadAllScreenshots}
+                    className="flex items-center gap-2 bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors text-xs sm:text-sm"
+                    title="Download all screenshots"
+                  >
+                    <Image size={16} />
+                    <span className="hidden sm:inline">Download Screenshots ({tradingData.filter(t => t.screenshot).length})</span>
+                    <span className="sm:hidden">Screenshots ({tradingData.filter(t => t.screenshot).length})</span>
+                  </button>
+                )}
+              </div>
               {tradingData.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <p className="text-sm sm:text-base">
